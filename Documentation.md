@@ -1,4 +1,4 @@
-# IntelliQuery Backend – Documentation
+# **IntelliQuery Backend – Documentation**
 
 ## 1. Architecture Overview
 
@@ -223,14 +223,14 @@ IntelliQuery backend is a robust, scalable, and extensible system for intelligen
 
 ```mermaid
 graph TD
-    A[Client (Frontend)] -->|HTTP Requests| B[Express API Server]
-    B --> C[Middleware (Auth, Validation)]
-    C --> D[Routes (auth, chat, search, etc.)]
-    D --> E[Business Logic (AI Agent, QueryGen, Executor)]
-    E --> F[MongoDB (Mongoose Models)]
+    A[Client: Frontend] -->|HTTP Requests| B[Express API Server]
+    B --> C[Middleware: Auth, Validation]
+    C --> D[Routes: auth, chat, search, etc.]
+    D --> E[Business Logic: AI Agent, QueryGen, Executor]
+    E --> F[MongoDB: Mongoose Models]
     E --> G[External Integrations]
-    E --> H[AI/ML Services (LangChain, OpenAI, Google GenAI)]
-    D --> I[Utilities (Email, Embedding, Vector Search)]
+    E --> H[AI/ML Services: LangChain, OpenAI, Google GenAI]
+    D --> I[Utilities: Email, Embedding, Vector Search]
 ```
 
 ---
@@ -248,55 +248,11 @@ flowchart TD
 
 ---
 
-## 3. Chat Query Generation Flow
-
-```mermaid
-flowchart TD
-    A[User] -->|Send Message| B[Chat Route]
-    B -->|Pass to Agent| C[LangGraph Agent]
-    C -->|Intent Detection| D[QueryGen Tool]
-    D -->|Generate Query| E[Executor Tool]
-    E -->|Run Query| F[Database/Integration]
-    F -->|Return Results| G[Chat Route]
-    G -->|Send Response| A
-    G -->|Log Query| H[QueryLog Model]
-```
-
----
-
-## 4. Semantic Search Flow
-
-```mermaid
-flowchart TD
-    A[User] -->|Search Request| B[Search Route]
-    B -->|Embed Query| C[Embedding Service]
-    C -->|Vector Search| D[VectorSearch Service]
-    D -->|Find Matches| E[SchemaVector Model]
-    E -->|Return Results| B
-    B -->|Send Response| A
-```
-
----
-
-## 5. Multi-Tenancy Data Isolation
-
-```mermaid
-flowchart TD
-    A[User (with JWT)] -->|Request| B[API Server]
-    B -->|Extract Tenant Info| C[Tenant Model]
-    C -->|Isolate Data| D[User/Chat/Schema Models]
-    D -->|Return Tenant-Specific Data| B
-    B -->|Send Response| A
-```
-
----
-
-## 6. Onboarding & Schema Setup
+## 3. Onboarding & Schema Setup
 
 ```mermaid
 flowchart TD
     A[New User/Tenant] -->|Onboarding Request| B[Onboarding Route]
-    B -->|Create Tenant| C[Tenant Model]
     B -->|Upload Schema| D[DatabaseSchema Model]
     D -->|Embed Schema| E[Embedding Service]
     E -->|Store Vector| F[SchemaVector Model]
@@ -305,15 +261,29 @@ flowchart TD
 
 ---
 
-## 7. Error Handling Flow
+## 4. Integrations for External Services (e.g. Tenant DB)
 
 ```mermaid
 flowchart TD
-    A[API Route] -->|Process Request| B[Business Logic]
-    B -->|Error Occurs?| C{Error?}
-    C -- Yes --> D[Log Error]
-    D --> E[Return Error Response]
-    C -- No --> F[Return Success Response]
+    A[Client] -->|POST /api/integration| B[Add Integration]
+    B -->|Validate Input| C{All Fields Present?}
+    C -- No --> D[Return 400 Error]
+    C -- Yes --> E[Create Integration Document]
+    E --> F[Save to MongoDB]
+    F --> G[Return 201 Success]
+```
+
+---
+
+## 5. Multi-Tenancy Data Isolation
+
+```mermaid
+flowchart TD
+    A[User: with JWT] -->|Request| B[API Server]
+    B -->|Extract Tenant Info| C[Tenant Model]
+    C -->|Isolate Data| D[User/Chat/Schema Models]
+    D -->|Return Tenant-Specific Data| B
+    B -->|Send Response| A
 ```
 
 ---
