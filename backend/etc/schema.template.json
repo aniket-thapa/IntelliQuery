@@ -1,0 +1,17 @@
+{
+  "databaseName": "YOUR_DATABASE_NAME",
+  "collections": [
+    {
+      "name": "COLLECTION_NAME",
+      "description": "What this collection stores",
+      "fields": [
+        {
+          "name": "FIELD_NAME",
+          "type": "string | number | date | boolean | ObjectId",
+          "description": "Meaning of this field",
+          "synonyms": ["optionalAlias1", "optionalAlias2"]
+        }
+      ]
+    }
+  ]
+}
