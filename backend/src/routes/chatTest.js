@@ -14,10 +14,18 @@ router.post('/test', authMiddleware, async (req, res) => {
         .json({ ok: false, error: 'tenantId and query are required' });
     }
 
+    let recentMessages = [];
     const agent = buildAgent();
-    const stateOut = await agent.invoke({ tenantId, userQuery: query });
+    const stateOut = await agent.invoke({
+      tenantId,
+      userQuery: query,
+      recentMessages,
+    });
 
-    const { schemaContext, mongoQuery, result, finalAnswer } = stateOut;
+    const { schemaContext, mongoQuery, result, finalAnswer, tableData } =
+      stateOut;
+
+    console.log('End Response to API Chat: ', stateOut);
 
     return res.json({
       ok: true,
@@ -25,7 +33,8 @@ router.post('/test', authMiddleware, async (req, res) => {
       schemaContext,
       mongoQuery,
       result,
-      finalAnswer, // 🟢 ready-to-show user-friendly response
+      finalAnswer,
+      tableData,
     });
   } catch (err) {
     console.error('Chat Test Route Error:', err);

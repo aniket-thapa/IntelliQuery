@@ -1,139 +1,163 @@
+// src/langgraph/agent.js
 import { StateGraph, END } from '@langchain/langgraph';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { searchSchemaVectors } from '../utils/vectorSearchService.js';
 import { getTenantDb } from '../utils/mongoClient.js';
 
-// Initial state shape
+import generateMongoQuery from './tools/queryGen.js';
+import repairMongoQuery from './tools/queryRepair.js';
+import formatResponse from './tools/responseFormatter.js';
+import { estimateAndTrimHistory } from '../utils/tokenUtils.js';
+import { mongo } from 'mongoose';
+
+const MAX_REPAIR_RETRIES = 2; // number of times LLM can repair a bad query
+
 const initialState = {
   tenantId: null,
   userQuery: '',
   schemaContext: null,
   mongoQuery: null,
   result: null,
-  finalAnswer: null, // 🆕 for frontend-friendly text
+  finalAnswer: null,
+  tableData: null,
+  recentMessages: [], // last few messages (user+agent) for context
 };
 
-// Build the Agent
 export function buildAgent() {
   const model = new ChatGoogleGenerativeAI({
     model: 'gemini-1.5-flash',
-    temperature: 0,
     apiKey: process.env.GOOGLE_API_KEY,
+    temperature: 0.0,
   });
 
   const graph = new StateGraph({ channels: initialState })
 
-    // 1️⃣ Find schema context using vector search
+    // 1) vector search => schema context
     .addNode('schemaSearch', async (state) => {
-      const response = await searchSchemaVectors(
-        state.tenantId,
-        state.userQuery,
-        12
-      );
+      if (!state.tenantId || !state.userQuery)
+        throw new Error('Missing tenantId or userQuery');
 
-      if (!response.ok) {
-        throw new Error('Schema vector search failed: ' + response.error);
-      }
+      const vs = await searchSchemaVectors(state.tenantId, state.userQuery, 10);
+      if (!vs.ok) throw new Error('Vector search failed: ' + vs.error);
 
-      return { schemaContext: response.matches };
+      // keep schemaContext but trimmed (we will also trim messages)
+      return { schemaContext: vs.matches };
     })
 
-    // 2️⃣ Generate a MongoDB query with Gemini
+    // 2) generate a MongoDB query using the model + recentMessages
     .addNode('queryGen', async (state) => {
-      const systemPrompt = `
-      You are an expert MongoDB query generator.
-      Use ONLY the provided schema fields and collections.
+      // reduce context size if needed
+      const recentMessages = estimateAndTrimHistory(state.recentMessages, 3500); // approx chars
+      const schemaContext = JSON.stringify(state.schemaContext || []);
 
-      Schema context: ${JSON.stringify(state.schemaContext, null, 2)}
+      const mq = await generateMongoQuery({
+        userQuery: state.userQuery,
+        schemaContext,
+        recentMessages,
+        model,
+      });
 
-      Return JSON strictly in this format:
-      {
-        "collection": "<collection>",
-        "filter": { ... },
-        "projection": { ... },
-        "limit": 50
-      }
-      `;
-
-      const response = await model.invoke([
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: state.userQuery },
-      ]);
-
-      let query;
-      try {
-        console.log('LLM Query Response:', response.content);
-
-        // Remove Markdown code block markers if present
-        let cleaned = response.content
-          .replace(/```json\s*/gi, '')
-          .replace(/```/g, '')
-          .trim();
-
-        console.log('Cleaned Query String:', cleaned);
-
-        query = JSON.parse(cleaned);
-      } catch (err) {
-        console.error('Invalid query JSON:', response.content);
-        throw new Error('Failed to parse query JSON');
-      }
-
-      return { mongoQuery: query };
+      return { mongoQuery: mq };
     })
 
-    // 3️⃣ Execute query on tenant DB
+    // 3) execute query; if execution error occurs, attempt to repair via LLM
     .addNode('executor', async (state) => {
-      try {
-        const db = await getTenantDb(state.tenantId);
-
-        const { collection, filter, projection, limit } = state.mongoQuery;
-
-        const result = await db
-          .collection(collection)
-          .find(filter || {}, { projection })
-          .limit(limit || 50)
-          .toArray();
-
-        return { result };
-      } catch (err) {
-        console.error('Execution Error:', err);
-        return { result: { error: err.message } };
+      const db = await getTenantDb(state.tenantId);
+      if (!state.mongoQuery || !state.mongoQuery.collection) {
+        return { result: { error: 'No valid mongoQuery to execute' } };
       }
+
+      // attempt & repair loop
+      let attempt = 0;
+      let lastQuery = state.mongoQuery;
+      while (attempt <= MAX_REPAIR_RETRIES) {
+        try {
+          // Basic safety check
+          const serialized = JSON.stringify(lastQuery).toLowerCase();
+          const forbidden = [
+            'drop',
+            'remove',
+            'delete',
+            'update',
+            '$where',
+            'eval',
+            'mapreduce',
+          ];
+          for (const f of forbidden)
+            if (serialized.includes(f)) {
+              return {
+                result: { error: 'Query contains forbidden operations' },
+              };
+            }
+
+          // Run query
+          const col = db.collection(lastQuery.collection);
+          if (lastQuery.aggregate && Array.isArray(lastQuery.aggregate)) {
+            const rows = await col
+              .aggregate(lastQuery.aggregate, { maxTimeMS: 15000 })
+              .toArray();
+            return { result: { ok: true, rows } };
+          } else {
+            const cursor = col.find(lastQuery.filter || {}, {
+              projection: lastQuery.projection || {},
+            });
+            if (lastQuery.limit) cursor.limit(lastQuery.limit);
+            const rows = await cursor.toArray();
+            return { result: { ok: true, rows } };
+          }
+        } catch (err) {
+          // Execution failed: ask LLM to repair
+          attempt += 1;
+          if (attempt > MAX_REPAIR_RETRIES) {
+            return {
+              result: {
+                error: 'Execution failed after retries: ' + err.message,
+              },
+            };
+          }
+          // Ask LLM to repair, provide error message and the failing query & schema context
+          const repaired = await repairMongoQuery({
+            failingQuery: lastQuery,
+            errorMessage: err.message,
+            schemaContext: state.schemaContext,
+            recentMessages: estimateAndTrimHistory(state.recentMessages, 3000),
+            model,
+          });
+          // repair function returns parsed JSON or throws
+          lastQuery = repaired;
+          // loop to attempt execution again
+        }
+      }
+
+      return { result: { error: 'Unexpected executor flow' } };
     })
 
-    // 4️⃣ Format a user-friendly response
+    // 4) format final answer (friendly text + optional tableData)
     .addNode('responseFormatter', async (state) => {
-      const prompt = `
-You are an assistant helping to explain database results to non-technical users.
+      // We give the formatter the original userQuery, schemaContext, and raw rows
+      const rows = state.result?.rows ?? [];
+      const formatterContext = {
+        userQuery: state.userQuery,
+        schemaContext: state.schemaContext,
+        mongoQuery: state.mongoQuery,
+        rows,
+      };
 
-The user asked: "${state.userQuery}"
-The raw database result was: ${JSON.stringify(state.result, null, 2)}
+      const { finalAnswer, tableData } = await formatResponse({
+        context: formatterContext,
+        model,
+        maxTokensForAnswer: 512,
+      });
 
-Write a short, clear, and user-friendly response for a chat UI.
-- If result is empty → say "No matching records found."
-- If result has multiple objects → summarize clearly, maybe list names or counts.
-- Keep it concise and human-readable.
-      `;
-
-      try {
-        const resp = await model.invoke(prompt);
-
-        console.log('Final Answer Response:', resp.content);
-        return { finalAnswer: resp.content };
-      } catch (err) {
-        console.error('Response Formatter Error:', err);
-        return {
-          finalAnswer: 'I found some data, but failed to generate a summary.',
-        };
-      }
+      return { finalAnswer, tableData };
     })
 
-    // Graph flow
+    // flow edges
+    .addEdge('__start__', 'schemaSearch')
     .addEdge('schemaSearch', 'queryGen')
     .addEdge('queryGen', 'executor')
     .addEdge('executor', 'responseFormatter')
-    .addEdge('responseFormatter', END)
-    .setEntryPoint('schemaSearch');
+    .addEdge('responseFormatter', END);
 
   return graph.compile();
 }

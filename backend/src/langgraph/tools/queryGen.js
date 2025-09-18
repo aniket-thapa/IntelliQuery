@@ -1,102 +1,89 @@
 // src/langgraph/tools/queryGen.js
-/**
- * generateMongoQuery: calls Gemini (ChatGoogleGenerativeAI) to produce a JSON
- * structure: { collection, filter, projection?, limit? }
- *
- * We instruct the model strictly to output JSON only and disallow any destructive ops.
- */
+// Responsible for the first attempt at generating a Mongo query
 
 const FORBIDDEN_TOKENS = [
   'drop',
   'remove',
   'delete',
   'update',
-  'mapReduce',
   '$where',
   'eval',
-  'system.profile',
+  'mapreduce',
 ];
 
 export default async function generateMongoQuery({
   userQuery,
-  schemaMatches,
+  schemaContext,
+  recentMessages,
   model,
 }) {
-  if (!userQuery) throw new Error('userQuery required');
-  if (!schemaMatches) throw new Error('schemaMatches required');
-
-  // Build a compact schema context for the LLM
-  const context = schemaMatches
-    .map(
-      (m, i) =>
-        `${i + 1}. ${m.collectionName}.${m.fieldName} — ${
-          m.description || ''
-        } (score: ${m.score?.toFixed(3)})`
-    )
-    .join('\n');
-
+  const currentDate = new Date().toISOString();
   const systemPrompt = `
-You are an assistant that MUST output a valid MongoDB query object in JSON ONLY. No explanation, no commentary.
-Use only the collections/fields listed in the "Schema Context". If uncertain, ask for clarification instead of guessing.
+You are an expert assistant that MUST output a valid JSON object that represents a MongoDB READ operation only.
+Use the schema fields provided. NO destructive operators allowed.
 
-Schema Context:
-${context}
+IMPORTANT: The current date and time is ${currentDate}. Use this to resolve any relative time phrases in the user's query (e.g., "today", "last month", "yesterday").
 
-Important rules:
-- Output must be valid JSON parseable to a JS object.
-- The object must be of the form:
-  {
-    "collection": "<collectionName>",
-    "filter": { ... },
-    "projection": { "<field>": 1, ... },   // optional
-    "limit": 50
-  }
-- DO NOT include any operations like drop, delete, update, mapReduce, $where, eval, or shell commands.
-- Dates should be expressed as ISO strings (e.g., "2025-09-01T00:00:00Z").
-- If the user mentions relative times like "last month", convert to explicit ISO range using the current date.
+Desired JSON format (example):
+{
+  "collection": "users",
+  "filter": { "country": "India", "createdAt": { "$gte": "2025-08-01T00:00:00Z", "$lt": "2025-09-01T00:00:00Z" } },
+  "projection": { "name": 1, "email": 1, "createdAt": 1 },
+  "limit": 100
+}
 
-Respond ONLY with the JSON object.
+Rules:
+- Output only JSON, no explanation.
+- Use only collections/fields from the schema context.
+- Dates: convert relative time phrases ("last month") to concrete ISO ranges.
+- Do not use any of: ${FORBIDDEN_TOKENS.join(', ')}.
+- If unsure, return a filter that is safe (e.g., {"filter": {}, "limit": 0}) instead of guessing.
+
+Schema context (list of collection.field and descriptions):
+${schemaContext}
+
+Recent chat messages (most recent last):
+${recentMessages.map((m) => `${m.sender}: ${m.text}`).join('\n')}
+
+User question:
+${userQuery}
 `;
 
-  const userPrompt = `User question: ${userQuery}`;
-
-  // Invoke model: using model.invoke API from langchain wrapper
   const response = await model.invoke([
     { role: 'system', content: systemPrompt },
-    { role: 'user', content: userPrompt },
+    { role: 'user', content: userQuery },
   ]);
 
-  const out = response?.content ?? response?.text ?? '';
-  // Basic defensive checks:
-  for (const bad of FORBIDDEN_TOKENS) {
-    if (out.toLowerCase().includes(bad)) {
-      throw new Error('Model output contains forbidden operations');
-    }
-  }
+  console.log('RESPONSE from LLM in QueryGen: ', response);
 
-  // parse JSON
+  const text = response?.content ?? response?.text ?? '';
+  // Attempt to parse JSON. If LLM included text, extract JSON substring
   let parsed;
   try {
-    parsed = typeof out === 'string' ? JSON.parse(out) : out;
+    console.log('LLM TEXT:', text);
+    parsed = JSON.parse(text);
   } catch (err) {
-    // Try extracting JSON substring (best-effort)
-    const jsonMatch = out.match(/\{[\s\S]*\}$/);
-    if (jsonMatch) {
-      parsed = JSON.parse(jsonMatch[0]);
+    const match = text.match(/\{[\s\S]*\}/);
+
+    console.log('MATCH ', match);
+    if (match) {
+      parsed = JSON.parse(match[0]);
     } else {
-      throw new Error('Generated text is not valid JSON');
+      throw new Error('LLM did not return valid JSON for mongo query');
     }
   }
 
-  // Final basic validation of parsed shape
-  if (!parsed.collection || !parsed.filter) {
-    throw new Error(
-      'Generated query missing required keys (collection/filter)'
-    );
+  // very basic forbidden token check
+  const serialized = JSON.stringify(parsed).toLowerCase();
+  for (const f of FORBIDDEN_TOKENS) {
+    if (serialized.includes(f))
+      throw new Error('Generated query contains forbidden operations');
   }
 
-  // Normalize limit
+  // Some normalization
   parsed.limit = parsed.limit || 50;
+  parsed.projection = parsed.projection || undefined;
+  parsed.filter = parsed.filter || {};
 
-  return JSON.stringify(parsed);
+  return parsed;
 }

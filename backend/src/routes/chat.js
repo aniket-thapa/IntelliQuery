@@ -41,7 +41,24 @@ router.post('/', authMiddleware, async (req, res) => {
 
     // 🤖 Run Agent
     const agent = buildAgent();
-    const stateOut = await agent.invoke({ tenantId, userQuery: query });
+
+    // fetch the chat doc to obtain history (if sessionId/chatId given)
+    let recentMessages = [];
+
+    if (chatDoc) {
+      // map to simplified messages for context
+      recentMessages = chatDoc.messages.map((m) => ({
+        sender: m.sender,
+        text: m.text,
+      }));
+      // keep only last ~15 messages or char-limited via tokenUtils in agent
+    }
+
+    const stateOut = await agent.invoke({
+      tenantId,
+      userQuery: query,
+      recentMessages,
+    });
 
     const { schemaContext, mongoQuery, result } = stateOut;
 

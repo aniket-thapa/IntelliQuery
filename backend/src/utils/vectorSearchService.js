@@ -37,16 +37,14 @@ export async function searchSchemaVectors(tenantId, query, k = 15) {
       },
       {
         $project: {
+          _id: 0,
           collectionName: 1,
           fieldName: 1,
           description: 1,
           fieldType: 1,
-          score: { $meta: 'vectorSearchScore' },
         },
       },
     ]);
-
-    // console.log('Vector Search Results:', results);
 
     return { ok: true, matches: results };
   } catch (err) {
