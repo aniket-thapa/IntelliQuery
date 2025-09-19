@@ -1,76 +1,82 @@
 // src/langgraph/tools/responseFormatter.js
 // Returns a friendly summary and optional table data for UI.
 
-export default async function formatResponse({
-  context,
-  model,
-  maxTokensForAnswer = 512,
-}) {
-  const { userQuery, mongoQuery, rows } = context;
+export default async function formatResponse(
+  { userQuery, mongoQuery, rows },
+  model
+) {
+  console.log('rows.length ................:', !rows);
+  try {
+    if (!rows || rows.length === 0) {
+      return {
+        summary: 'No results found.',
+        explanation:
+          'The query ran successfully, but there was no data that matched your criteria.',
+        data: '[]',
+        chartSuggestion: 'none',
+      };
+    }
 
-  // If no rows
-  if (!rows || rows.length === 0) {
-    const finalAnswer = 'No matching records found.';
-    return { finalAnswer, tableData: { columns: [], rows: [] } };
-  }
+    const recordCount = rows.length;
+    const dataSample = rows.slice(0, 5);
+    const fieldNames = Object.keys(rows[0]);
+    const statsSummary = `Found ${recordCount} total records.`;
 
-  // Ask LLM to produce a short summary and optionally table info
-  const prompt = `
-You are an assistant that formats DB results for a user interface.
+    console.log('Record Count:', recordCount);
+    console.log('DATATSSSSSAMPLE:', dataSample);
 
-User question:
-${userQuery}
+    const prompt = `
+      You are an expert data analyst working for a multi-tenant SaaS application called IntelliQuery. Your role is to interpret the results of a database query and explain them in simple, clear, and business-friendly language for a non-technical user.
 
-Mongo Query (short):
-${JSON.stringify(mongoQuery)}
+      **Context:**
+      - Original User Question: "${userQuery}"
+      - Executed MongoDB Query: "${JSON.stringify(mongoQuery)}"
 
-Rows (first 20 shown):
-${JSON.stringify(rows)}
+      **Query Result Analysis:**
+      - Total Records Found: ${recordCount}
+      - Data Fields: [${fieldNames.join(', ')}]
+      - Aggregate Statistics: "${statsSummary}"
+      - Data Sample (first 5 records):
+      \`\`\`json
+      ${JSON.stringify(dataSample)}
+      \`\`\`
 
-Produce a JSON object with:
-{
-  "finalAnswer": "<short friendly text, 1-3 sentences>",
-  "table": {
-    "columns": ["col1","col2",...],
-    "rows": [
-      {"col1": value, "col2": value, ...},
-      ...
-    ]
-  }
-}
+      **Your Task:**
+      Based on all the context above, generate a JSON object with the following structure. Do NOT include any text outside of the JSON object itself.
 
-Only return valid JSON. If rows are too large, include only top 10 rows in 'table.rows'.
+      1.  \`summary\`: A concise, one or two-sentence natural language summary answering the user's original question directly.
+      2.  \`explanation\`: A slightly more detailed paragraph explaining the findings. If there are many results, mention the total count and explain that you are showing a sample. If there are interesting patterns or totals, mention them here.
+      3.  \`data\`: The sample data provided to you, formatted as a JSON string.
+      4.  \`chartSuggestion\`: Based on the data fields and the user's question, suggest a suitable chart type. Valid options are: "bar", "line", "pie", or "none". For example, if the user asked for a count over time, suggest "line". If they asked for a breakdown by category, suggest "bar" or "pie".
+
+      **Example Output Format:**
+      {
+      "summary": "...",
+      "explanation": "...",
+      "data": "...",
+      "chartSuggestion": "..."
+      }
 `;
 
-  const response = await model.invoke([
-    { role: 'system', content: 'You are a concise formatter for chat UI.' },
-    { role: 'user', content: prompt },
-  ]);
+    // 3. Invoke the LLM
+    const response = await model.invoke([{ role: 'user', content: prompt }]);
+    const responseText = response?.content ?? response?.text ?? '';
 
-  const text = response?.content ?? response?.text ?? '';
-  let parsed;
-  try {
-    parsed = JSON.parse(text);
-  } catch (err) {
-    const match = text.match(/\{[\s\S]*\}$/);
-    if (match) parsed = JSON.parse(match[0]);
-    else {
-      // fallback: create a simple answer
-      const finalAnswer = `Returned ${
-        rows.length
-      } rows. Showing first ${Math.min(rows.length, 10)} rows.`;
-      const columns = rows.length ? Object.keys(rows[0]) : [];
-      const table = { columns, rows: rows.slice(0, 10) };
-      return { finalAnswer, tableData: table };
-    }
+    console.log('RESPONSE FORMATTER RESPONSE: ', responseText);
+
+    // Clean and parse the LLM's JSON output
+    const formattedResponse = JSON.parse(
+      responseText.replace(/```json/g, '').replace(/```/g, '')
+    );
+
+    return formattedResponse;
+  } catch (error) {
+    console.error('Error in Response Formatting Agent:', error);
+    return {
+      summary: `Found ${rows?.length} results.`,
+      explanation: 'Displaying a sample of the raw data.',
+      data: JSON.stringify(rows?.slice(0, 10), null, 2),
+      chartSuggestion: 'none',
+    };
   }
-
-  // sanitize parsed
-  const finalAnswer = parsed.finalAnswer || `Returned ${rows.length} rows.`;
-  const tableData = parsed.table || {
-    columns: rows.length ? Object.keys(rows[0]) : [],
-    rows: rows.slice(0, 10),
-  };
-
-  return { finalAnswer, tableData };
 }

@@ -22,8 +22,15 @@ router.post('/test', authMiddleware, async (req, res) => {
       recentMessages,
     });
 
-    const { schemaContext, mongoQuery, result, finalAnswer, tableData } =
-      stateOut;
+    const {
+      schemaContext,
+      mongoQuery,
+      result,
+      data,
+      explanation,
+      summary,
+      chartSuggestion,
+    } = stateOut;
 
     console.log('End Response to API Chat: ', stateOut);
 
@@ -33,8 +40,10 @@ router.post('/test', authMiddleware, async (req, res) => {
       schemaContext,
       mongoQuery,
       result,
-      finalAnswer,
-      tableData,
+      data,
+      explanation,
+      summary,
+      chartSuggestion,
     });
   } catch (err) {
     console.error('Chat Test Route Error:', err);

@@ -18,9 +18,11 @@ const initialState = {
   schemaContext: null,
   mongoQuery: null,
   result: null,
-  finalAnswer: null,
-  tableData: null,
-  recentMessages: [], // last few messages (user+agent) for context
+  data: null, // Final Answer
+  explanation: null,
+  summary: null,
+  chartSuggestion: null,
+  recentMessages: [],
 };
 
 export function buildAgent() {
@@ -134,22 +136,25 @@ export function buildAgent() {
 
     // 4) format final answer (friendly text + optional tableData)
     .addNode('responseFormatter', async (state) => {
-      // We give the formatter the original userQuery, schemaContext, and raw rows
       const rows = state.result?.rows ?? [];
       const formatterContext = {
         userQuery: state.userQuery,
-        schemaContext: state.schemaContext,
         mongoQuery: state.mongoQuery,
         rows,
       };
 
-      const { finalAnswer, tableData } = await formatResponse({
-        context: formatterContext,
-        model,
-        maxTokensForAnswer: 512,
-      });
+      console.log('ROWSSSSS:', rows);
+      const { data, explanation, summary, chartSuggestion } =
+        await formatResponse(
+          {
+            userQuery: state.userQuery,
+            mongoQuery: state.mongoQuery,
+            rows,
+          },
+          model
+        );
 
-      return { finalAnswer, tableData };
+      return { data, explanation, summary, chartSuggestion };
     })
 
     // flow edges
