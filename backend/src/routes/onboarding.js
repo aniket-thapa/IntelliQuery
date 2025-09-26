@@ -1,3 +1,4 @@
+// backend/src/routes/onboarding.js
 import express from 'express';
 import DatabaseSchema from '../models/DatabaseSchema.js';
 import Tenant from '../models/Tenant.js';
@@ -15,6 +16,7 @@ router.post('/schema', authMiddleware, async (req, res) => {
 
     if (!databaseName || !collections) {
       return res.status(400).json({
+        status: false,
         error: 'Database name and collections are required',
       });
     }
@@ -22,14 +24,15 @@ router.post('/schema', authMiddleware, async (req, res) => {
     // Check if tenant exists
     const tenant = await Tenant.findById(tenantId);
     if (!tenant) {
-      return res.status(404).json({ error: 'Tenant not found' });
+      return res.status(404).json({ status: false, error: 'Tenant not found' });
     }
 
     const isSchemaExist = await DatabaseSchema.findOne({ tenantId });
     if (isSchemaExist) {
-      return res
-        .status(400)
-        .json({ error: 'Schema already exists for this tenant' });
+      return res.status(400).json({
+        status: false,
+        error: 'Schema already exists for this tenant',
+      });
     }
 
     // Save schema
@@ -47,12 +50,13 @@ router.post('/schema', authMiddleware, async (req, res) => {
       .catch((err) => console.error('Embedding error:', err.message));
 
     res.json({
+      status: true,
       message: 'Schema uploaded successfully. Embeddings are being processed.',
       schema: dbSchema,
     });
   } catch (err) {
     console.error('Schema upload error:', err.message);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ status: false, error: 'Server error' });
   }
 });
 
@@ -63,13 +67,13 @@ router.get('/schema', authMiddleware, async (req, res) => {
 
     const schema = await DatabaseSchema.findOne({ tenantId });
     if (!schema) {
-      return res.status(404).json({ error: 'Schema not found' });
+      return res.status(404).json({ status: false, error: 'Schema not found' });
     }
 
-    res.json({ schema });
+    res.json({ status: true, schema });
   } catch (err) {
     console.error('Get schema error:', err.message);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ status: false, error: 'Server error' });
   }
 });
 
@@ -81,7 +85,7 @@ router.put('/schema', authMiddleware, async (req, res) => {
 
     const dbSchema = await DatabaseSchema.findOne({ tenantId });
     if (!dbSchema) {
-      return res.status(404).json({ error: 'Schema not found' });
+      return res.status(404).json({ status: false, error: 'Schema not found' });
     }
 
     if (name) dbSchema.name = name;
@@ -95,12 +99,13 @@ router.put('/schema', authMiddleware, async (req, res) => {
       .catch((err) => console.error('Embedding error:', err.message));
 
     res.json({
+      status: true,
       message: 'Schema updated. Embeddings are re-processing.',
       dbSchema,
     });
   } catch (err) {
     console.error('Update schema error:', err.message);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ status: false, error: 'Server error' });
   }
 });
 
@@ -110,22 +115,24 @@ router.delete('/schema', authMiddleware, async (req, res) => {
     const tenantId = req.user.tenantId;
 
     if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID missing' });
+      return res
+        .status(400)
+        .json({ status: false, error: 'Tenant ID missing' });
     }
 
     if (!req.user.role || req.user.role === 'member') {
-      return res.status(403).json({ error: 'Forbidden' });
+      return res.status(403).json({ status: false, error: 'Forbidden' });
     }
 
     const schema = await DatabaseSchema.findOneAndDelete({ tenantId });
     if (!schema) {
-      return res.status(404).json({ error: 'Schema not found' });
+      return res.status(404).json({ status: false, error: 'Schema not found' });
     }
 
-    res.json({ message: 'Schema deleted' });
+    res.json({ status: true, message: 'Schema deleted' });
   } catch (err) {
     console.error('Delete schema error:', err.message);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ status: false, error: 'Server error' });
   }
 });
 

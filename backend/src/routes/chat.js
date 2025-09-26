@@ -1,4 +1,4 @@
-// src/routes/chat.js
+// src/routes/chat.js main chat route
 import express from 'express';
 import { buildAgent } from '../langgraph/agent.js';
 import { authMiddleware } from '../middleware/auth.js';
@@ -6,90 +6,98 @@ import Chat from '../models/Chat.js';
 
 const router = express.Router();
 
-/**
- * POST /api/chat
- * Body: { tenantId, query, chatId?, sessionId }
- */
+// POST /api/chat
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { tenantId, query, chatId, sessionId } = req.body;
+    const { query } = req.body;
 
-    if (!tenantId || !query || !sessionId) {
+    if (!query) {
       return res
         .status(400)
-        .json({ ok: false, error: 'tenantId, query, and sessionId required' });
+        .json({ status: false, error: 'Query is required' });
     }
-
-    // 📝 Persist user message
-    let chatDoc;
-    if (chatId) {
-      chatDoc = await Chat.findById(chatId);
-      if (!chatDoc) {
-        return res.status(404).json({ ok: false, error: 'Chat not found' });
-      }
-      chatDoc.messages.push({ sender: 'user', text: query });
-      await chatDoc.save();
-    } else {
-      chatDoc = new Chat({
-        tenantId,
-        userId: req.user.id,
-        sessionId,
-        messages: [{ sender: 'user', text: query }],
+    const tenantId = req.user.tenantId;
+    const userId = req.user.id;
+    if (!tenantId) {
+      return res.status(400).json({
+        status: false,
+        error: 'Tenant is required',
       });
-      await chatDoc.save();
     }
+    // Find the user's chat document, or create it if it doesn't exist
+    let chatDoc = await Chat.findOne({ userId });
+    if (!chatDoc) {
+      chatDoc = new Chat({ tenantId, userId, messages: [] });
+    }
+    chatDoc.messages.push({ sender: 'user', text: query });
+    await chatDoc.save();
 
-    // 🤖 Run Agent
+    const recent = chatDoc.messages
+      .slice(-10)
+      .map((m) => ({ sender: m.sender, text: m.text }));
+
+    // invoke agent
     const agent = buildAgent();
-
-    // fetch the chat doc to obtain history (if sessionId/chatId given)
-    let recentMessages = [];
-
-    if (chatDoc) {
-      // map to simplified messages for context
-      recentMessages = chatDoc.messages.map((m) => ({
-        sender: m.sender,
-        text: m.text,
-      }));
-      // keep only last ~15 messages or char-limited via tokenUtils in agent
-    }
-
     const stateOut = await agent.invoke({
       tenantId,
       userQuery: query,
-      recentMessages,
+      recentMessages: recent,
     });
 
-    const { schemaContext, mongoQuery, result } = stateOut;
+    const finalAnswer =
+      stateOut.finalAnswer ?? (stateOut.result?.ok ? 'Done' : 'No result');
+    const tableData = stateOut.tableData ?? null;
+    const rows = stateOut.result?.rows ?? [];
+    const mongoQuery = stateOut.mongoQuery ?? null;
+    const schemaContext = stateOut.schemaContext ?? null;
 
-    let agentReply;
-    if (Array.isArray(result)) {
-      agentReply = JSON.stringify(result, null, 2);
-    } else if (result?.error) {
-      agentReply = `⚠️ Error: ${result.error}`;
-    } else {
-      agentReply = 'No result';
-    }
-
-    // Append agent reply
+    // append agent response
     chatDoc.messages.push({
       sender: 'agent',
-      text: agentReply,
-      data: { schemaContext, mongoQuery, rawResult: result },
+      text: finalAnswer,
+      data: {
+        mongoQuery,
+        schemaContext,
+        rawResult: rows,
+        tableData,
+      },
     });
     await chatDoc.save();
 
-    // Return structured response
     return res.json({
-      ok: true,
-      chatId: chatDoc._id,
-      schemaContext,
+      status: true,
+      finalAnswer,
+      tableData,
+      rows,
       mongoQuery,
-      result,
+      chatId: chatDoc._id,
     });
   } catch (err) {
     console.error('Chat route error:', err);
-    return res.status(500).json({ ok: false, error: err.message });
+    return res.status(500).json({ status: false, error: err.message });
+  }
+});
+
+// The paginated GET route to fetch chat messages
+// GET /api/chat/messages?page=1&limit=20
+router.get('/messages', authMiddleware, async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+
+    const chat = await Chat.findOne({ userId: req.user.id }).slice('messages', [
+      -(page * limit),
+      limit,
+    ]);
+
+    if (!chat) {
+      // If no chat, return empty messages array
+      return res.json({ ok: true, messages: [] });
+    }
+
+    res.json({ ok: true, messages: chat.messages.reverse() });
+  } catch (err) {
+    console.error('Fetch messages error:', err);
+    res.status(500).json({ ok: false, error: 'Internal server error' });
   }
 });
 

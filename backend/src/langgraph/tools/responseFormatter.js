@@ -1,82 +1,90 @@
 // src/langgraph/tools/responseFormatter.js
-// Returns a friendly summary and optional table data for UI.
+import extractAndParseJson from '../../utils/extractAndParseJson.js';
 
-export default async function formatResponse(
-  { userQuery, mongoQuery, rows },
-  model
-) {
-  console.log('rows.length ................:', !rows);
-  try {
-    if (!rows || rows.length === 0) {
-      return {
-        summary: 'No results found.',
-        explanation:
-          'The query ran successfully, but there was no data that matched your criteria.',
-        data: '[]',
-        chartSuggestion: 'none',
-      };
-    }
+export default async function formatResponse({ context, model }) {
+  const { userQuery, schemaContext, rows } = context;
 
-    const recordCount = rows.length;
-    const dataSample = rows.slice(0, 5);
-    const fieldNames = Object.keys(rows[0]);
-    const statsSummary = `Found ${recordCount} total records.`;
+  // Handle the case where the query returns no data
+  if (!rows || rows.length === 0) {
+    return {
+      // Use markdown for a consistent look and feel
+      finalAnswer:
+        "### No Results\nI couldn't find any records matching your query.",
+      // Provide an empty structure for the frontend
+      tableData: { visualization: null, markdownResponse: 'No data found.' },
+    };
+  }
 
-    console.log('Record Count:', recordCount);
-    console.log('DATATSSSSSAMPLE:', dataSample);
+  // Use a larger sample for better analysis, but cap it to avoid huge prompts
+  const sampleRows = rows.slice(0, 50);
+  const prompt = `
+You are a senior Data Analyst AI. Your task is to interpret a user's question and the resulting database query results, then present the findings in a clear, insightful, and visually appealing way for a web UI.
 
-    const prompt = `
-      You are an expert data analyst working for a multi-tenant SaaS application called IntelliQuery. Your role is to interpret the results of a database query and explain them in simple, clear, and business-friendly language for a non-technical user.
+You MUST return a single, valid JSON object with two keys: "markdownResponse" and "visualization".
 
-      **Context:**
-      - Original User Question: "${userQuery}"
-      - Executed MongoDB Query: "${JSON.stringify(mongoQuery)}"
+1.  **markdownResponse**: A string containing a comprehensive analysis in Markdown format.
+    * Start with a concise, natural-language summary of the findings.
+    * Follow with a well-structured Markdown table of the data.
+    * If the data has many columns, choose the most relevant ones. Do not show document IDs unless explicitly asked.
 
-      **Query Result Analysis:**
-      - Total Records Found: ${recordCount}
-      - Data Fields: [${fieldNames.join(', ')}]
-      - Aggregate Statistics: "${statsSummary}"
-      - Data Sample (first 5 records):
-      \`\`\`json
-      ${JSON.stringify(dataSample)}
-      \`\`\`
+2.  **visualization**: An object that suggests a chart for the frontend to render, or \`null\` if no chart is appropriate.
+    * **chartType**: Suggest a chart type from: 'bar', 'pie', 'line', 'doughnut', or 'table'. Choose the best type to represent the data. For example, use 'pie' for proportions, 'bar' for comparisons, 'line' for time-series. If no chart fits well, use 'table'.
+    * **data**: Format the data to be directly consumable by a library like Chart.js.
+        * **labels**: An array of strings for the x-axis or pie chart segments.
+        * **datasets**: An array of dataset objects. Each object should have a \`label\` (string) and \`data\` (an array of numbers).
 
-      **Your Task:**
-      Based on all the context above, generate a JSON object with the following structure. Do NOT include any text outside of the JSON object itself.
+**RULES:**
+* Analyze the data to identify the best labels and datasets for the chart. For example, if the user asks "How many users per country?", the labels should be the countries and the data should be the user counts.
+* Do not invent data. All information must come from the provided rows.
+* The entire output must be ONLY the JSON object. No commentary.
 
-      1.  \`summary\`: A concise, one or two-sentence natural language summary answering the user's original question directly.
-      2.  \`explanation\`: A slightly more detailed paragraph explaining the findings. If there are many results, mention the total count and explain that you are showing a sample. If there are interesting patterns or totals, mention them here.
-      3.  \`data\`: The sample data provided to you, formatted as a JSON string.
-      4.  \`chartSuggestion\`: Based on the data fields and the user's question, suggest a suitable chart type. Valid options are: "bar", "line", "pie", or "none". For example, if the user asked for a count over time, suggest "line". If they asked for a breakdown by category, suggest "bar" or "pie".
+---
+**CONTEXT**
 
-      **Example Output Format:**
-      {
-      "summary": "...",
-      "explanation": "...",
-      "data": "...",
-      "chartSuggestion": "..."
-      }
+**User's Original Question:**
+${userQuery}
+
+**Database Results (sample of ${sampleRows.length} out of ${
+    rows.length
+  } total rows):**
+${JSON.stringify(sampleRows, null, 2)}
+
+---
+Now, generate the JSON response.
 `;
 
-    // 3. Invoke the LLM
-    const response = await model.invoke([{ role: 'user', content: prompt }]);
-    const responseText = response?.content ?? response?.text ?? '';
+  const response = await model.invoke([
+    {
+      role: 'system',
+      content:
+        'You are a data analyst AI that formats database results into a comprehensive JSON object with Markdown and chart data.',
+    },
+    { role: 'user', content: prompt },
+  ]);
 
-    console.log('RESPONSE FORMATTER RESPONSE: ', responseText);
-
-    // Clean and parse the LLM's JSON output
-    const formattedResponse = JSON.parse(
-      responseText.replace(/```json/g, '').replace(/```/g, '')
-    );
-
-    return formattedResponse;
-  } catch (error) {
-    console.error('Error in Response Formatting Agent:', error);
+  const raw = response?.content ?? '';
+  try {
+    const parsed = extractAndParseJson(raw);
+    if (!parsed.markdownResponse) {
+      throw new Error('LLM did not return the expected markdownResponse.');
+    }
+    // Return the full structured data. The key `tableData` is kept for consistency with the agent's state.
     return {
-      summary: `Found ${rows?.length} results.`,
-      explanation: 'Displaying a sample of the raw data.',
-      data: JSON.stringify(rows?.slice(0, 10), null, 2),
-      chartSuggestion: 'none',
+      finalAnswer: parsed.markdownResponse, // Keep the markdown here for direct rendering
+      tableData: parsed, // Pass the whole object with { markdownResponse, visualization }
+    };
+  } catch (err) {
+    console.error('Error parsing AI response formatter:', err);
+    // Fallback in case of a parsing error
+    return {
+      finalAnswer:
+        "### Query Successful\nI've retrieved the data, but there was an issue formatting the detailed analysis. Here is the raw data.",
+      tableData: {
+        markdownResponse: `**Raw Data (${
+          rows.length
+        } rows)**\n\n\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``,
+        visualization: null,
+      },
     };
   }
 }

@@ -1,5 +1,6 @@
 import express from 'express';
 import dotenv from 'dotenv';
+import cors from 'cors';
 import { connectDB } from './config/db.js';
 import authRoutes from './routes/auth.js';
 import onboardingRoutes from './routes/onboarding.js';
@@ -12,6 +13,9 @@ import chatTestRoutes from './routes/chatTest.js';
 
 dotenv.config();
 const app = express();
+
+app.use(cors());
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -23,8 +27,8 @@ app.use('/api/integration', integrationRoutes);
 app.use('/api/tenant', tenantRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/search', searchRoutes);
-app.use('/api/chat', chatTestRoutes);
-// app.use('/api/chat', chatRoutes);
+// app.use('/api/chat', chatTestRoutes);
+app.use('/api/chat', chatRoutes);
 
 app.get('/', (req, res) => res.send('IntelliQuery backend running...'));
 

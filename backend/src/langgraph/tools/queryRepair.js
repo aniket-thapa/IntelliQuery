@@ -1,15 +1,4 @@
-// src/langgraph/tools/queryRepair.js
-// Given a failing query and error message, ask the LLM to produce a corrected query JSON.
-
-const FORBIDDEN_TOKENS = [
-  'drop',
-  'remove',
-  'delete',
-  'update',
-  '$where',
-  'eval',
-  'mapreduce',
-];
+import extractAndParseJson from '../../utils/extractAndParseJson.js';
 
 export default async function repairMongoQuery({
   failingQuery,
@@ -18,58 +7,51 @@ export default async function repairMongoQuery({
   recentMessages,
   model,
 }) {
-  const prompt = `
-The previously generated MongoDB query failed when executed. Do not be defensive — repair it.
+  console.log('Attempting to repair failing query:', failingQuery);
+  console.log('Error message:', errorMessage);
 
-Failing query (JSON):
+  const prompt = `
+A MongoDB aggregation pipeline failed. Your task is to correct it based on the error and schema.
+Return ONLY the corrected, valid JSON object with "collection" and "pipeline" keys.
+
+**Security Rules**: The pipeline MUST be read-only. Do not use stages like $out or $merge. Do not include keywords like update, delete, or drop.
+
+Failing Query Object:
 ${JSON.stringify(failingQuery, null, 2)}
 
-Error message from MongoDB:
+Error Message Received:
 ${errorMessage}
 
-Schema context:
+Schema Context (use this to fix field names, types, and lookups):
 ${JSON.stringify(schemaContext, null, 2)}
 
-Recent chat messages:
-${recentMessages.map((m) => `${m.sender}: ${m.text}`).join('\n')}
+Recent Messages (for conversational context):
+${(recentMessages || []).map((m) => `${m.sender}: ${m.text}`).join('\n')}
 
-Produce only a corrected MongoDB query JSON (same format as before).
-Rules:
-- No destructive operators
-- If the failure is due to syntax or field mismatch, correct it using only the schema context.
-- Ensure the JSON is parseable.
+Return a corrected JSON object in the format { "collection": "collectionName", "pipeline": [...] }. Do NOT include any explanations or commentary.
 `;
 
   const response = await model.invoke([
     {
       role: 'system',
       content:
-        'You are a helpful assistant that corrects MongoDB JSON queries.',
+        'You are a MongoDB expert that corrects failing aggregation pipelines. You only output valid JSON.',
     },
     { role: 'user', content: prompt },
   ]);
 
-  const text = response?.content ?? response?.text ?? '';
-  // parse JSON
-  let parsed;
-  try {
-    parsed = JSON.parse(text);
-  } catch (err) {
-    const match = text.match(/\{[\s\S]*\}$/);
-    if (match) parsed = JSON.parse(match[0]);
-    else throw new Error('Repair LLM did not return valid JSON');
+  const raw = response?.content ?? '';
+  let parsed = extractAndParseJson(raw);
+
+  if (!parsed) {
+    throw new Error('Repair LLM did not return valid JSON');
   }
 
-  // check for forbidden words
-  const serialized = JSON.stringify(parsed).toLowerCase();
-  for (const f of FORBIDDEN_TOKENS) {
-    if (serialized.includes(f))
-      throw new Error('Repair contains forbidden operations');
+  if (!parsed.collection || !Array.isArray(parsed.pipeline)) {
+    throw new Error(
+      'Repaired query is missing "collection" or "pipeline" key.'
+    );
   }
-
-  parsed.limit = parsed.limit || 50;
-  parsed.projection = parsed.projection || undefined;
-  parsed.filter = parsed.filter || {};
 
   return parsed;
 }

@@ -11,19 +11,19 @@ router.post('/schema', async (req, res) => {
     if (!tenantId || !query) {
       return res
         .status(400)
-        .json({ ok: false, error: 'tenantId and query are required' });
+        .json({ status: false, error: 'tenantId and query are required' });
     }
 
     const result = await searchSchemaVectors(tenantId, query, k || 5);
 
     if (!result.ok) {
-      return res.status(500).json(result);
+      return res.status(500).json({ status: false, result });
     }
 
-    res.json(result);
+    res.json({ status: false, result });
   } catch (err) {
     console.error('Search route error:', err.message);
-    res.status(500).json({ ok: false, error: 'Internal server error' });
+    res.status(500).json({ status: false, error: 'Internal server error' });
   }
 });
 

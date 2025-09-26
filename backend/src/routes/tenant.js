@@ -1,3 +1,4 @@
+// backend/src/routes/tenant.js
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import Tenant from '../models/Tenant.js';
@@ -14,10 +15,11 @@ router.get('/me', authMiddleware, async (req, res) => {
       'members',
       'name email role'
     );
-    if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
-    res.json({ tenant });
+    if (!tenant)
+      return res.status(404).json({ status: false, error: 'Tenant not found' });
+    res.json({ status: true, tenant });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ status: false, error: err.message });
   }
 });
 
@@ -28,11 +30,14 @@ router.post('/invite', authMiddleware, async (req, res) => {
     const tenantId = req.user.tenantId;
 
     const tenant = await Tenant.findById(tenantId);
-    if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
+    if (!tenant)
+      return res.status(404).json({ status: false, error: 'Tenant not found' });
 
     // Only owner can invite
     if (tenant.ownerId.toString() !== req.user.id.toString()) {
-      return res.status(403).json({ error: 'Only owner can invite members' });
+      return res
+        .status(403)
+        .json({ status: false, error: 'Only owner can invite members' });
     }
 
     let user = await User.findOne({ email });
@@ -57,13 +62,19 @@ router.post('/invite', authMiddleware, async (req, res) => {
 
     const mailResult = await sendEmail(email, 'invite', inviteLink);
     if (!mailResult.ok) {
-      return res.status(500).json({ error: 'Failed to send invite email' });
+      return res
+        .status(500)
+        .json({ status: false, error: 'Failed to send invite email' });
     }
 
-    res.json({ message: 'Invite sent successfully', inviteLink });
+    res.json({
+      status: false,
+      message: 'Invite sent successfully',
+      inviteLink,
+    });
   } catch (err) {
     console.error('Invite error:', err.message);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ status: false, error: 'Server error' });
   }
 });
 

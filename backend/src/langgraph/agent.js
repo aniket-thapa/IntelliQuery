@@ -1,164 +1,180 @@
 // src/langgraph/agent.js
+// dotenv
+import 'dotenv/config';
+
 import { StateGraph, END } from '@langchain/langgraph';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
+// import { LangsmithClient } from 'langsmith';
+
 import { searchSchemaVectors } from '../utils/vectorSearchService.js';
 import { getTenantDb } from '../utils/mongoClient.js';
-
 import generateMongoQuery from './tools/queryGen.js';
 import repairMongoQuery from './tools/queryRepair.js';
 import formatResponse from './tools/responseFormatter.js';
 import { estimateAndTrimHistory } from '../utils/tokenUtils.js';
-import { mongo } from 'mongoose';
 
-const MAX_REPAIR_RETRIES = 2; // number of times LLM can repair a bad query
+const MAX_REPAIR_RETRIES = 2;
 
 const initialState = {
   tenantId: null,
   userQuery: '',
+  recentMessages: [],
   schemaContext: null,
   mongoQuery: null,
   result: null,
-  data: null, // Final Answer
-  explanation: null,
-  summary: null,
-  chartSuggestion: null,
-  recentMessages: [],
+  finalAnswer: null,
+  tableData: null,
 };
 
 export function buildAgent() {
   const model = new ChatGoogleGenerativeAI({
-    model: 'gemini-1.5-flash',
+    model: 'gemini-2.0-flash',
     apiKey: process.env.GOOGLE_API_KEY,
     temperature: 0.0,
   });
 
   const graph = new StateGraph({ channels: initialState })
 
-    // 1) vector search => schema context
+    // ENTRY point
+    .addEdge('__start__', 'schemaSearch')
+
+    // 1) Schema search node
     .addNode('schemaSearch', async (state) => {
-      if (!state.tenantId || !state.userQuery)
-        throw new Error('Missing tenantId or userQuery');
+      if (!state.tenantId) throw new Error('tenantId required');
+      if (!state.userQuery) throw new Error('userQuery required');
 
-      const vs = await searchSchemaVectors(state.tenantId, state.userQuery, 10);
+      const trimmedHistory = estimateAndTrimHistory(state.recentMessages, 3000);
+      const vs = await searchSchemaVectors(state.tenantId, state.userQuery, 15);
       if (!vs.ok) throw new Error('Vector search failed: ' + vs.error);
-
-      // keep schemaContext but trimmed (we will also trim messages)
-      return { schemaContext: vs.matches };
+      return { schemaContext: vs.matches, recentMessages: trimmedHistory };
     })
 
-    // 2) generate a MongoDB query using the model + recentMessages
+    // 2) Query generation node (first attempt)
     .addNode('queryGen', async (state) => {
-      // reduce context size if needed
-      const recentMessages = estimateAndTrimHistory(state.recentMessages, 3500); // approx chars
-      const schemaContext = JSON.stringify(state.schemaContext || []);
+      const shortSchema = JSON.stringify(
+        (state.schemaContext || []).slice(0, 12),
+        null,
+        2
+      );
+      const recent = state.recentMessages || [];
 
       const mq = await generateMongoQuery({
         userQuery: state.userQuery,
-        schemaContext,
-        recentMessages,
+        schemaContext: shortSchema,
+        recentMessages: recent,
         model,
       });
-
       return { mongoQuery: mq };
     })
 
-    // 3) execute query; if execution error occurs, attempt to repair via LLM
+    // 3) Executor node (executes and repairs on error)
     .addNode('executor', async (state) => {
-      const db = await getTenantDb(state.tenantId);
-      if (!state.mongoQuery || !state.mongoQuery.collection) {
-        return { result: { error: 'No valid mongoQuery to execute' } };
+      console.log('State before Executor:', JSON.stringify(state, null, 2));
+
+      // --- 1. Input Validation ---
+      // Still check if the query object has the right shape.
+      if (!state.mongoQuery?.pipeline || !state.mongoQuery?.collection) {
+        return {
+          result: {
+            ok: false,
+            error:
+              'State is missing mongoQuery.pipeline or mongoQuery.collection',
+          },
+        };
       }
 
-      // attempt & repair loop
+      const db = await getTenantDb(state.tenantId);
+      let lastPipeline = state.mongoQuery.pipeline;
+      let collectionName = state.mongoQuery.collection;
       let attempt = 0;
-      let lastQuery = state.mongoQuery;
+
       while (attempt <= MAX_REPAIR_RETRIES) {
         try {
-          // Basic safety check
-          const serialized = JSON.stringify(lastQuery).toLowerCase();
-          const forbidden = [
-            'drop',
-            'remove',
-            'delete',
-            'update',
-            '$where',
-            'eval',
-            'mapreduce',
-          ];
-          for (const f of forbidden)
-            if (serialized.includes(f)) {
-              return {
-                result: { error: 'Query contains forbidden operations' },
-              };
-            }
+          // --- 2. Execution (Forbidden checks have been removed) ---
+          console.log(`Executing pipeline on collection '${collectionName}':`);
+          const rows = await db
+            .collection(collectionName)
+            .aggregate(lastPipeline, { maxTimeMS: 15000 })
+            .toArray();
 
-          // Run query
-          const col = db.collection(lastQuery.collection);
-          if (lastQuery.aggregate && Array.isArray(lastQuery.aggregate)) {
-            const rows = await col
-              .aggregate(lastQuery.aggregate, { maxTimeMS: 15000 })
-              .toArray();
-            return { result: { ok: true, rows } };
-          } else {
-            const cursor = col.find(lastQuery.filter || {}, {
-              projection: lastQuery.projection || {},
-            });
-            if (lastQuery.limit) cursor.limit(lastQuery.limit);
-            const rows = await cursor.toArray();
-            return { result: { ok: true, rows } };
-          }
+          // On success, return the results immediately.
+          return {
+            result: { ok: true, rows },
+            mongoQuery: { pipeline: lastPipeline, collection: collectionName },
+          };
         } catch (err) {
-          // Execution failed: ask LLM to repair
+          console.error(
+            `Execution attempt ${attempt + 1} failed:`,
+            err.message
+          );
           attempt += 1;
           if (attempt > MAX_REPAIR_RETRIES) {
             return {
               result: {
-                error: 'Execution failed after retries: ' + err.message,
+                ok: false,
+                error: `Execution failed after ${MAX_REPAIR_RETRIES} retries: ${err.message}`,
               },
             };
           }
-          // Ask LLM to repair, provide error message and the failing query & schema context
-          const repaired = await repairMongoQuery({
-            failingQuery: lastQuery,
+
+          // --- 3. Repair Loop ---
+          // If execution fails, try to repair the query.
+          const trimmedHistory = estimateAndTrimHistory(
+            state.recentMessages,
+            2500
+          );
+
+          const repairedQuery = await repairMongoQuery({
+            failingQuery: {
+              pipeline: lastPipeline,
+              collection: collectionName,
+            },
             errorMessage: err.message,
             schemaContext: state.schemaContext,
-            recentMessages: estimateAndTrimHistory(state.recentMessages, 3000),
+            recentMessages: trimmedHistory,
             model,
           });
-          // repair function returns parsed JSON or throws
-          lastQuery = repaired;
-          // loop to attempt execution again
+
+          if (repairedQuery?.pipeline && repairedQuery?.collection) {
+            // Update variables to retry the loop with the new query.
+            lastPipeline = repairedQuery.pipeline;
+            collectionName = repairedQuery.collection;
+          } else {
+            // If the repair tool fails, exit the process.
+            return {
+              result: {
+                ok: false,
+                error: 'Query repair failed to return a valid format.',
+              },
+            };
+          }
         }
       }
 
-      return { result: { error: 'Unexpected executor flow' } };
+      // This return is a fallback and should not be reached in normal operation.
+      return {
+        result: { ok: false, error: 'Executor flow ended unexpectedly' },
+      };
     })
 
-    // 4) format final answer (friendly text + optional tableData)
+    // 4) Response formatter - user friendly + tableData
     .addNode('responseFormatter', async (state) => {
+      console.log('State before Response Formatter:', state);
       const rows = state.result?.rows ?? [];
-      const formatterContext = {
+      const context = {
         userQuery: state.userQuery,
-        mongoQuery: state.mongoQuery,
+        schemaContext: state.schemaContext,
         rows,
       };
-
-      console.log('ROWSSSSS:', rows);
-      const { data, explanation, summary, chartSuggestion } =
-        await formatResponse(
-          {
-            userQuery: state.userQuery,
-            mongoQuery: state.mongoQuery,
-            rows,
-          },
-          model
-        );
-
-      return { data, explanation, summary, chartSuggestion };
+      const { finalAnswer, tableData } = await formatResponse({
+        context,
+        model,
+      });
+      console.log('State after Response Formatter:', state);
+      return { finalAnswer, tableData };
     })
 
     // flow edges
-    .addEdge('__start__', 'schemaSearch')
     .addEdge('schemaSearch', 'queryGen')
     .addEdge('queryGen', 'executor')
     .addEdge('executor', 'responseFormatter')

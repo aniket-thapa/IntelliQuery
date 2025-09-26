@@ -54,7 +54,7 @@ export async function sendEmail(to, type, link) {
 
     return { ok: true, messageId: info.messageId };
   } catch (err) {
-    console.error('Error sending email:', err.message);
+    console.error('Error sending email:', err);
     return { ok: false, error: err.message };
   }
 }
