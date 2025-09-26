@@ -9,7 +9,6 @@ import userRoutes from './routes/user.js';
 import tenantRoutes from './routes/tenant.js';
 import searchRoutes from './routes/search.js';
 import chatRoutes from './routes/chat.js';
-import chatTestRoutes from './routes/chatTest.js';
 
 dotenv.config();
 const app = express();
@@ -27,7 +26,6 @@ app.use('/api/integration', integrationRoutes);
 app.use('/api/tenant', tenantRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/search', searchRoutes);
-// app.use('/api/chat', chatTestRoutes);
 app.use('/api/chat', chatRoutes);
 
 app.get('/', (req, res) => res.send('IntelliQuery backend running...'));
