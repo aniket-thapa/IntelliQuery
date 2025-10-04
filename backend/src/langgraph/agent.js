@@ -1,11 +1,6 @@
 // src/langgraph/agent.js
-// dotenv
-import 'dotenv/config';
-
 import { StateGraph, END } from '@langchain/langgraph';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
-// import { LangsmithClient } from 'langsmith';
-
 import { searchSchemaVectors } from '../utils/vectorSearchService.js';
 import { getTenantDb } from '../utils/mongoClient.js';
 import generateMongoQuery from './tools/queryGen.js';
@@ -69,20 +64,15 @@ export function buildAgent() {
 
     // 3) Executor node (executes and repairs on error)
     .addNode('executor', async (state) => {
-      console.log('State before Executor:', JSON.stringify(state, null, 2));
-
-      // --- 1. Input Validation ---
-      // Still check if the query object has the right shape.
       if (!state.mongoQuery?.pipeline || !state.mongoQuery?.collection) {
         return {
           result: {
-            ok: false,
+            status: false,
             error:
               'State is missing mongoQuery.pipeline or mongoQuery.collection',
           },
         };
       }
-
       const db = await getTenantDb(state.tenantId);
       let lastPipeline = state.mongoQuery.pipeline;
       let collectionName = state.mongoQuery.collection;
@@ -90,16 +80,12 @@ export function buildAgent() {
 
       while (attempt <= MAX_REPAIR_RETRIES) {
         try {
-          // --- 2. Execution (Forbidden checks have been removed) ---
-          console.log(`Executing pipeline on collection '${collectionName}':`);
           const rows = await db
             .collection(collectionName)
             .aggregate(lastPipeline, { maxTimeMS: 15000 })
             .toArray();
-
-          // On success, return the results immediately.
           return {
-            result: { ok: true, rows },
+            result: { status: true, rows },
             mongoQuery: { pipeline: lastPipeline, collection: collectionName },
           };
         } catch (err) {
@@ -111,19 +97,15 @@ export function buildAgent() {
           if (attempt > MAX_REPAIR_RETRIES) {
             return {
               result: {
-                ok: false,
+                status: false,
                 error: `Execution failed after ${MAX_REPAIR_RETRIES} retries: ${err.message}`,
               },
             };
           }
-
-          // --- 3. Repair Loop ---
-          // If execution fails, try to repair the query.
           const trimmedHistory = estimateAndTrimHistory(
             state.recentMessages,
             2500
           );
-
           const repairedQuery = await repairMongoQuery({
             failingQuery: {
               pipeline: lastPipeline,
@@ -134,16 +116,13 @@ export function buildAgent() {
             recentMessages: trimmedHistory,
             model,
           });
-
           if (repairedQuery?.pipeline && repairedQuery?.collection) {
-            // Update variables to retry the loop with the new query.
             lastPipeline = repairedQuery.pipeline;
             collectionName = repairedQuery.collection;
           } else {
-            // If the repair tool fails, exit the process.
             return {
               result: {
-                ok: false,
+                status: false,
                 error: 'Query repair failed to return a valid format.',
               },
             };
@@ -151,15 +130,13 @@ export function buildAgent() {
         }
       }
 
-      // This return is a fallback and should not be reached in normal operation.
       return {
-        result: { ok: false, error: 'Executor flow ended unexpectedly' },
+        result: { status: false, error: 'Executor flow ended unexpectedly' },
       };
     })
 
     // 4) Response formatter - user friendly + tableData
     .addNode('responseFormatter', async (state) => {
-      console.log('State before Response Formatter:', state);
       const rows = state.result?.rows ?? [];
       const context = {
         userQuery: state.userQuery,
@@ -170,7 +147,6 @@ export function buildAgent() {
         context,
         model,
       });
-      console.log('State after Response Formatter:', state);
       return { finalAnswer, tableData };
     })
 

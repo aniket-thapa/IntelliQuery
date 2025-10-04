@@ -32,9 +32,10 @@ router.post('/', authMiddleware, async (req, res) => {
     chatDoc.messages.push({ sender: 'user', text: query });
     await chatDoc.save();
 
-    const recent = chatDoc.messages
-      .slice(-10)
-      .map((m) => ({ sender: m.sender, text: m.text }));
+    const recent = chatDoc.messages.slice(-10).map((m) => ({
+      sender: m.sender,
+      text: m.sender === 'agent' ? m.data.mongoQuery : m.text,
+    }));
 
     // invoke agent
     const agent = buildAgent();
@@ -45,33 +46,29 @@ router.post('/', authMiddleware, async (req, res) => {
     });
 
     const finalAnswer =
-      stateOut.finalAnswer ?? (stateOut.result?.ok ? 'Done' : 'No result');
-    const tableData = stateOut.tableData ?? null;
-    const rows = stateOut.result?.rows ?? [];
-    const mongoQuery = stateOut.mongoQuery ?? null;
-    const schemaContext = stateOut.schemaContext ?? null;
+      stateOut?.finalAnswer ||
+      "I'm sorry, I couldn't process your request at this time.";
+    const tableData = stateOut?.tableData ?? null;
+    const mongoQuery = stateOut?.mongoQuery ?? null;
+    const schemaContext = stateOut?.schemaContext ?? null;
 
     // append agent response
     chatDoc.messages.push({
       sender: 'agent',
-      text: finalAnswer,
+      text:
+        typeof finalAnswer === 'string'
+          ? finalAnswer
+          : JSON.stringify(finalAnswer),
       data: {
         mongoQuery,
         schemaContext,
-        rawResult: rows,
+        rawResult: tableData?.rows || null,
         tableData,
       },
     });
     await chatDoc.save();
 
-    return res.json({
-      status: true,
-      finalAnswer,
-      tableData,
-      rows,
-      mongoQuery,
-      chatId: chatDoc._id,
-    });
+    return res.json({ status: true, finalAnswer, tableData, mongoQuery });
   } catch (err) {
     console.error('Chat route error:', err);
     return res.status(500).json({ status: false, error: err.message });
@@ -84,20 +81,54 @@ router.get('/messages', authMiddleware, async (req, res) => {
   try {
     const { page = 1, limit = 20 } = req.query;
 
-    const chat = await Chat.findOne({ userId: req.user.id }).slice('messages', [
-      -(page * limit),
-      limit,
-    ]);
+    const chat = await Chat.findOne({ userId: req.user.id });
 
     if (!chat) {
       // If no chat, return empty messages array
-      return res.json({ ok: true, messages: [] });
+      return res.json({ status: true, messages: [] });
     }
+    // Slice messages in JS (get latest messages for pagination)
+    const start = Math.max(chat.messages.length - page * limit, 0);
+    const end = chat.messages.length - (page - 1) * limit;
+    const paginatedMessages = chat.messages.slice(start, end).reverse();
 
-    res.json({ ok: true, messages: chat.messages.reverse() });
+    res.json({ status: true, messages: paginatedMessages.reverse() });
   } catch (err) {
     console.error('Fetch messages error:', err);
-    res.status(500).json({ ok: false, error: 'Internal server error' });
+    res.status(500).json({ status: false, error: 'Internal server error' });
+  }
+});
+
+// DELETE /api/chat/messages/:messageId
+router.delete('/messages/:messageId', authMiddleware, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const userId = req.user.id;
+
+    // Find the user's chat document
+    const chatDoc = await Chat.findOne({ userId });
+    if (!chatDoc) {
+      return res.status(404).json({ status: false, error: 'Chat not found' });
+    }
+
+    // Find the index of the message to delete
+    const idx = chatDoc.messages.findIndex(
+      (msg) => msg._id.toString() === messageId
+    );
+    if (idx === -1) {
+      return res
+        .status(404)
+        .json({ status: false, error: 'Message not found' });
+    }
+
+    // Remove the message
+    chatDoc.messages.splice(idx, 1);
+    await chatDoc.save();
+
+    return res.json({ status: true, message: 'Message deleted' });
+  } catch (err) {
+    console.error('Delete message error:', err);
+    res.status(500).json({ status: false, error: 'Internal server error' });
   }
 });
 
