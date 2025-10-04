@@ -14,7 +14,7 @@ import Settings from '../pages/Settings';
 
 function PrivateRoute({ children }) {
   const { token } = useAuth();
-  return token ? children : <Navigate to="/login" />;
+  return token ? children : <Navigate to="/login" replace />;
 }
 
 function AdminRoute({ children }) {

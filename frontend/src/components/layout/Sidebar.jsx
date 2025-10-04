@@ -1,4 +1,4 @@
-import { Home, MessageCircle, Settings } from 'lucide-react';
+import { FileJson, Home, Link, MessageCircle, Settings } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 export default function Sidebar() {
@@ -6,6 +6,8 @@ export default function Sidebar() {
     { to: '/dashboard', label: 'Dashboard', icon: Home },
     { to: '/chat', label: 'Chat', icon: MessageCircle },
     { to: '/settings', label: 'Settings', icon: Settings },
+    { to: '/integration', label: 'Integration', icon: Link },
+    { to: '/onboarding', label: 'DB Schema', icon: FileJson },
   ];
 
   return (
