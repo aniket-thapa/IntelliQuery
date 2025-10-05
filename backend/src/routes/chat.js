@@ -92,7 +92,7 @@ router.get('/messages', authMiddleware, async (req, res) => {
     const end = chat.messages.length - (page - 1) * limit;
     const paginatedMessages = chat.messages.slice(start, end);
 
-    res.json({ status: true, messages: paginatedMessages.reverse() });
+    res.json({ status: true, messages: paginatedMessages });
   } catch (err) {
     console.error('Fetch messages error:', err);
     res.status(500).json({ status: false, error: 'Internal server error' });
