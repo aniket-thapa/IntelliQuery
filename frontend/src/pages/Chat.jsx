@@ -42,7 +42,7 @@ export default function Chat() {
     try {
       const res = await api.get(`/chat/messages?page=${p}&limit=10`);
       if (res.data.status) {
-        const newMsgs = res.data.messages.reverse() || [];
+        const newMsgs = res.data.messages || [];
         setMessages((prev) => (append ? [...newMsgs, ...prev] : newMsgs));
         setHasMore(newMsgs.length >= 10);
       }
