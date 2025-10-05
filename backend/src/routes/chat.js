@@ -90,7 +90,7 @@ router.get('/messages', authMiddleware, async (req, res) => {
     // Slice messages in JS (get latest messages for pagination)
     const start = Math.max(chat.messages.length - page * limit, 0);
     const end = chat.messages.length - (page - 1) * limit;
-    const paginatedMessages = chat.messages.slice(start, end).reverse();
+    const paginatedMessages = chat.messages.slice(start, end);
 
     res.json({ status: true, messages: paginatedMessages.reverse() });
   } catch (err) {
