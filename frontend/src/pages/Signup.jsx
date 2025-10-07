@@ -30,6 +30,7 @@ export default function Signup() {
     name: '',
     email: '',
     password: '',
+    organisation: '',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
