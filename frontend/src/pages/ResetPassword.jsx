@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { jwtDecode } from 'jwt-decode';
 import api from '../lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,12 +25,31 @@ export default function ResetPassword() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isTokenExpired, setIsTokenExpired] = useState(false);
+  const [isTokenValidating, setIsTokenValidating] = useState(true);
 
   useEffect(() => {
     // If no token in URL, prevent direct access and redirect to request-password page
     if (!token) {
       navigate('/request-password-reset', { replace: true });
       return;
+    }
+    try {
+      const decodedToken = jwtDecode(token);
+      const currentTime = Date.now() / 1000;
+
+      if (decodedToken.exp < currentTime) {
+        setError(
+          'Your password reset link has expired. Please request a new one.'
+        );
+        setIsTokenExpired(true);
+      }
+    } catch (err) {
+      setError('Invalid password reset link. Please request a new one.');
+      console.error(err.message);
+      setIsTokenExpired(true);
+    } finally {
+      setIsTokenValidating(false);
     }
   }, [token, navigate]);
 
@@ -48,13 +68,60 @@ export default function ResetPassword() {
         setTimeout(() => navigate('/login'), 2000);
       } else {
         setError(res.data.error || 'Invalid or expired token.');
+        setIsTokenExpired(true);
       }
     } catch (err) {
       setError(err.response?.data?.error || 'Error resetting password.');
+      if (err.response?.data?.error.toLowerCase().includes('expired')) {
+        setIsTokenExpired(true);
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  if (isTokenValidating) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Card className="w-full max-w-sm">
+          <CardContent className="flex justify-center items-center p-10">
+            <LoaderCircle className="h-8 w-8 animate-spin text-muted-foreground" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (isTokenExpired) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Card className="w-full max-w-sm">
+          <CardHeader>
+            <CardTitle className="text-2xl">Link Invalid</CardTitle>
+            <CardDescription>
+              This password reset link is no longer valid.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {error && (
+              <p className="text-sm text-center text-destructive">{error}</p>
+            )}
+          </CardContent>
+          <CardFooter className="flex flex-col gap-4 mt-4">
+            <Button asChild className="w-full">
+              <Link to="/forgot-password">Forgot Password Request</Link>
+            </Button>
+            <div className="text-center text-sm text-muted-foreground">
+              Return to Login?{' '}
+              <Link to="/login" className="underline hover:text-primary">
+                Login
+              </Link>
+            </div>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
