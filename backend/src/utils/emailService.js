@@ -5,18 +5,18 @@ import { htmlToText } from 'html-to-text';
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: process.env.SMTP_PORT,
-  secure: false,
+  secure: false, // Use `true` for port 465, `false` for other ports
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
 });
 
-// --- IntelliQuery Logo SVG ---
+// --- IntelliQuery Logo SVG (Updated for Light Mode) ---
 const logoSvg = `
   <svg width="250" height="64" viewBox="0 0 250 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <!-- BrainCircuit Icon -->
-    <g transform="translate(18, 7) scale(2.2)" stroke="#22D3EE" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="#22D3EE" fill-opacity="0.1">
+    <!-- BrainCircuit Icon (Color is vibrant and works on light BG) -->
+    <g transform="translate(18, 7) scale(2.2)" stroke="#0891B2" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="#0891B2" fill-opacity="0.1">
         <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/>
         <path d="M9 13a4.5 4.5 0 0 0 3-4"/>
         <path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"/>
@@ -31,11 +31,11 @@ const logoSvg = `
         <circle cx="20" cy="21" r=".5"/>
         <circle cx="20" cy="8" r=".5"/>
     </g>
-    <!-- Logotype and Tagline -->
-    <text x="82" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="24" font-weight="bold" fill="white" style="letter-spacing: -0.5px;">
+    <!-- Logotype and Tagline (Colors changed to dark text) -->
+    <text x="82" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="24" font-weight="bold" fill="#111827" style="letter-spacing: -0.5px;">
         IntelliQuery
     </text>
-    <text x="82" y="52" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" fill="#94a3b8">
+    <text x="82" y="52" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" fill="#6B7280">
         AI Data Analyst
     </text>
   </svg>
@@ -46,23 +46,22 @@ const EmailTemplate = ({ title, bodyContent, buttonLink, buttonText }) => `
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-g">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${title}</title>
     <style>
-        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #020817; color: #cbd5e1; }
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f3f4f6; color: #374151; }
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
         .header { text-align: center; padding: 20px 0; }
-        .content { background-color: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 32px; }
-        .content h2 { color: #f8fafc; font-size: 24px; margin-top: 0; }
+        .content { background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 32px; }
+        .content h2 { color: #111827; font-size: 24px; margin-top: 0; }
         .content p { font-size: 16px; line-height: 1.6; margin: 16px 0; }
         .button { display: inline-block; padding: 14px 28px; background-color: #4f46e5; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; }
-        .footer { text-align: center; padding: 20px 0; font-size: 12px; color: #64748b; }
-        .footer a { color: #94a3b8; text-decoration: none; }
+        .footer { text-align: center; padding: 20px 0; font-size: 12px; color: #6B7280; }
     </style>
 </head>
 <body>
-    <table width="100%" border="0" cellspacing="0" cellpadding="0">
+    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f3f4f6;">
         <tr>
             <td align="center" style="padding: 20px 0;">
                 <table width="600" border="0" cellspacing="0" cellpadding="0" class="container">
@@ -130,7 +129,9 @@ export async function sendEmail(to, type, link) {
     });
 
     const mailOptions = {
-      from: `"IntelliQuery" <${process.env.MAIL_FROM}>`,
+      from: `"IntelliQuery" <${
+        process.env.MAIL_FROM || process.env.SMTP_USER
+      }>`,
       to,
       subject,
       html,
