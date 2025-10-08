@@ -1,4 +1,5 @@
 import React from 'react';
+import { TypeAnimation } from 'react-type-animation';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -36,7 +37,6 @@ const InteractiveDemo = () => {
   const [step, setStep] = React.useState(0);
   const fullText =
     'Show me the total sales per product category for the last quarter.';
-  const [typedText, setTypedText] = React.useState('');
 
   const steps = [
     { type: 'user' },
@@ -54,23 +54,6 @@ const InteractiveDemo = () => {
     }, timings[step]);
     return () => clearInterval(interval);
   }, [step, steps.length]);
-
-  // Typing effect for user question
-  React.useEffect(() => {
-    if (step === 0) {
-      setTypedText(''); // Reset text when step 0 starts
-      let i = 0;
-      const typingInterval = setInterval(() => {
-        if (i < fullText.length) {
-          setTypedText((prev) => prev + fullText.charAt(i));
-          i++;
-        } else {
-          clearInterval(typingInterval);
-        }
-      }, 50);
-      return () => clearInterval(typingInterval);
-    }
-  }, [step]);
 
   const currentStep = steps[step];
   const chartData = [
@@ -94,9 +77,16 @@ const InteractiveDemo = () => {
         <div className="flex items-start gap-3 mb-4">
           <span className="text-green-400 flex-shrink-0">&gt;</span>
           <p className="text-gray-300">
-            {step === 0 ? typedText : fullText}
-            {step === 0 && (
-              <span className="inline-block w-2 h-4 bg-green-400 animate-pulse ml-1"></span>
+            {step === 0 ? (
+              <TypeAnimation
+                sequence={[fullText]}
+                wrapper="span"
+                speed={60}
+                cursor={true}
+                style={{ display: 'inline-block' }}
+              />
+            ) : (
+              fullText
             )}
           </p>
         </div>
