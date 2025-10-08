@@ -31,6 +31,7 @@ export default function Signup() {
     name: '',
     email: '',
     password: '',
+    tenantName: '',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -154,7 +155,7 @@ export default function Signup() {
                   />
                   <Input
                     id="organisation"
-                    name="organisation"
+                    name="tenantName"
                     type="text"
                     placeholder="Your Organisation"
                     className="pl-10"
