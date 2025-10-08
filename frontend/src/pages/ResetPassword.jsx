@@ -102,7 +102,6 @@ export default function ResetPassword() {
       <div className="min-h-screen flex flex-col">
         <Header />
         <main className="flex-1 flex items-center justify-center px-4">
-          {' '}
           <Card className="w-full max-w-sm bg-black/30">
             <CardHeader>
               <CardTitle className="text-2xl">Link Invalid</CardTitle>

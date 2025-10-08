@@ -16,7 +16,11 @@ const userSchema = new mongoose.Schema(
       enum: ['admin', 'developer', 'member'],
       default: 'member',
     },
-    tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant' },
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tenant',
+      default: null,
+    },
   },
   { timestamps: true }
 );

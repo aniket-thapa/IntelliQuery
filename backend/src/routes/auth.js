@@ -4,7 +4,9 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import Tenant from '../models/Tenant.js';
+import Invitation from '../models/Invitation';
 import { sendEmail } from '../utils/emailService.js';
+import e from 'express';
 
 const router = express.Router();
 
@@ -155,45 +157,93 @@ router.post('/reset-password', async (req, res) => {
 });
 
 router.post('/accept-invite', async (req, res) => {
+  const { token, password } = req.body;
+
+  if (!token) {
+    return res.status(400).json({ status: false, error: 'Token is required' });
+  }
+
   try {
-    const { token, password, newPassword } = req.body;
-    if (!token || !password)
-      return res
-        .status(400)
-        .json({ status: false, error: 'Token and password required' });
-
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.userId);
-    const tenantId = decoded.tenantId;
-    if (!user)
-      return res.status(404).json({ status: false, error: 'User not found' });
+    const { email, name, tenantId, role, jti } = decoded;
 
-    if (user.passwordHash !== 'TEMP') {
+    const invitation = await Invitation.findOne({ tokenIdentifier: jti });
+
+    if (!invitation) {
       return res
         .status(400)
-        .json({ status: false, error: 'Invite already accepted' });
+        .json({ status: false, error: 'Invalid invitation link.' });
+    }
+    if (invitation.status === 'accepted') {
+      return res.status(400).json({
+        status: false,
+        error: 'This invitation has already been accepted.',
+      });
     }
 
-    const hash = await bcrypt.hash(newPassword, 10);
-    user.passwordHash = hash;
-    user.tenantId = tenantId;
-    await user.save();
+    const existingUser = await User.findOne({ email });
 
-    const tenant = await Tenant.findById(tenantId);
-    if (!tenant)
-      return res.status(404).json({ status: false, error: 'Tenant not found' });
+    // --- Core Logic Change (Using a Transaction for Atomicity) ---
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      if (existingUser) {
+        return res.status(409).json({
+          status: false,
+          error:
+            'This user is already a member of a tenant and cannot join a new one.',
+        });
+      } else {
+        if (!password) {
+          return res.status(400).json({
+            status: false,
+            error: 'Password is required.',
+          });
+        }
+        const passwordHash = await bcrypt.hash(password, 10);
+        const newUser = new User({ name, email, passwordHash, role, tenantId });
+        await newUser.save({ session });
 
-    // Add member to tenant members if not already
-    if (!tenant.members.includes(user._id)) {
-      tenant.members.push(user._id);
-      await tenant.save();
+        const tenant = await Tenant.findById(tenantId).session(session);
+        if (!tenant) throw new Error('Tenant not found.');
+
+        tenant.members.push(newUser._id);
+        await tenant.save({ session });
+      }
+
+      invitation.status = 'accepted';
+      await invitation.save({ session });
+
+      await session.commitTransaction();
+
+      res.status(200).json({
+        status: true,
+        message: 'Success! You are now a member of the tenant.',
+      });
+    } catch (transactionError) {
+      await session.abortTransaction();
+      console.error('Invite acceptance transaction error:', transactionError);
+      res
+        .status(500)
+        .json({ status: false, error: 'Could not process invitation.' });
+    } finally {
+      session.endSession();
     }
-
-    res.json({ status: true, message: 'Invite accepted, you can now login' });
   } catch (err) {
+    if (err instanceof jwt.TokenExpiredError) {
+      return res
+        .status(400)
+        .json({ status: false, error: 'This invitation link has expired.' });
+    }
+    if (err instanceof jwt.JsonWebTokenError) {
+      return res
+        .status(400)
+        .json({ status: false, error: 'Invalid invitation link.' });
+    }
+    console.error('Accept invite error:', err.message);
     res
-      .status(400)
-      .json({ status: false, error: 'Invalid or expired invite token' });
+      .status(500)
+      .json({ status: false, error: 'An unexpected error occurred.' });
   }
 });
 
