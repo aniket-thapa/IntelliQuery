@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import api from '../lib/api';
 import { Link } from 'react-router-dom';
+import Header from '../components/Header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -41,54 +42,58 @@ export default function RequestPasswordReset() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle className="text-2xl">Forgot Password</CardTitle>
-          <CardDescription>
-            Enter your email and we'll send you a link to reset your password.
-          </CardDescription>
-        </CardHeader>
-        <form onSubmit={handleSubmit}>
-          <CardContent className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="email">Email</Label>
-              <div className="relative">
-                <Mail
-                  strokeWidth={1.5}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground"
-                />
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="m@example.com"
-                  className="pl-10"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
+    <div className="min-h-screen flex flex-col">
+      <Header />
+      <main className="flex-1 flex items-center justify-center px-4">
+        {' '}
+        <Card className="w-full max-w-sm bg-black/30">
+          <CardHeader>
+            <CardTitle className="text-2xl">Forgot Password</CardTitle>
+            <CardDescription>
+              Enter your email and we'll send you a link to reset your password.
+            </CardDescription>
+          </CardHeader>
+          <form onSubmit={handleSubmit}>
+            <CardContent className="grid gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="email">Email</Label>
+                <div className="relative">
+                  <Mail
+                    strokeWidth={1.5}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground"
+                  />
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    placeholder="m@example.com"
+                    className="pl-10"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
               </div>
-            </div>
-          </CardContent>
-          <CardFooter className="flex flex-col gap-4 mt-4">
-            {message && <p className="text-sm text-green-500">{message}</p>}
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading && (
-                <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
-              )}
-              {loading ? 'Sending link...' : 'Send Reset Link'}
-            </Button>
-            <div className="text-center text-sm text-muted-foreground">
-              Remember your password?{' '}
-              <Link to="/login" className="underline hover:text-primary">
-                Login
-              </Link>
-            </div>
-          </CardFooter>
-        </form>
-      </Card>
+            </CardContent>
+            <CardFooter className="flex flex-col gap-4 mt-4">
+              {message && <p className="text-sm text-green-500">{message}</p>}
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading && (
+                  <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                {loading ? 'Sending link...' : 'Send Reset Link'}
+              </Button>
+              <div className="text-center text-sm text-muted-foreground">
+                Remember your password?{' '}
+                <Link to="/login" className="underline hover:text-primary">
+                  Login
+                </Link>
+              </div>
+            </CardFooter>
+          </form>
+        </Card>
+      </main>
     </div>
   );
 }

@@ -1,7 +1,11 @@
 @import 'tailwindcss';
-@import "tw-animate-css";
+@import 'tw-animate-css';
 
 @custom-variant dark (&:where(.dark, .dark *));
+
+body {
+  background-color: #020817;
+}
 
 .prose {
   max-width: none;
