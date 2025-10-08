@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
 import Tenant from '../models/Tenant.js';
 import User from '../models/User.js';
-import Invitation from '../models/Invitation';
+import Invitation from '../models/Invitation.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { sendEmail } from '../utils/emailService.js';
 
