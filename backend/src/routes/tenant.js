@@ -58,7 +58,7 @@ router.post('/invite', authMiddleware, async (req, res) => {
       { expiresIn: '1d' }
     );
 
-    const inviteLink = `${process.env.APP_URL}/api/auth/accept-invite?token=${inviteToken}`;
+    const inviteLink = `${process.env.APP_URL}/accept-invite?token=${inviteToken}`;
 
     const mailResult = await sendEmail(email, 'invite', inviteLink);
     if (!mailResult.ok) {

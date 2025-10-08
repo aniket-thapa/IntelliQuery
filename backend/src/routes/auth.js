@@ -113,7 +113,7 @@ router.post('/request-password-reset', async (req, res) => {
       { expiresIn: '30m' }
     );
 
-    const resetLink = `${process.env.APP_URL}/api/auth/reset-password?token=${resetToken}`;
+    const resetLink = `${process.env.APP_URL}/reset-password?token=${resetToken}`;
 
     const mailResult = await sendEmail(email, 'reset', resetLink);
     if (!mailResult.ok) {
