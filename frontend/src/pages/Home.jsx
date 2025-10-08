@@ -3,7 +3,6 @@ import { TypeAnimation } from 'react-type-animation';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Database,
   BarChart3,
   ArrowRight,
   MessageSquare,
@@ -31,6 +30,28 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import { Input } from '@/components/ui/input';
+
+const IntelliQueryLogo = () => {
+  return (
+    <Link to="/" className="group flex items-center gap-2 select-none">
+      <div className="relative flex items-center justify-center">
+        <div className="relative mx-1 flex items-center justify-center">
+          <BrainCircuit className="relative h-7 w-7 text-cyan-400 " />
+        </div>
+      </div>
+
+      <div className="flex flex-col leading-tight">
+        <span className="text-lg sm:text-xl font-bold tracking-tight">
+          IntelliQuery
+        </span>
+        <span className="text-[11px] text-gray-400 group-hover:text-gray-100 transition-colors">
+          AI Data Analyst
+        </span>
+      </div>
+    </Link>
+  );
+};
 
 // --- Interactive Demo Component for Hero Section ---
 const InteractiveDemo = () => {
@@ -319,32 +340,17 @@ export default function App() {
 
       <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-black/50 backdrop-blur-lg">
         <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
-          <Link to="/" className="group flex items-center gap-2 select-none">
-            <div className="relative flex items-center justify-center">
-              <div className="relative mx-1 flex items-center justify-center">
-                <BrainCircuit className="relative h-7 w-7 text-cyan-400 " />
-              </div>
-            </div>
-
-            <div className="flex flex-col leading-tight">
-              <span className="text-lg sm:text-xl font-bold tracking-tight">
-                IntelliQuery
-              </span>
-              <span className="text-[11px] text-gray-400 group-hover:text-gray-100 transition-colors">
-                AI Data Analyst
-              </span>
-            </div>
-          </Link>
+          <IntelliQueryLogo />
 
           <nav className="hidden md:flex items-center gap-6">
             {navLinks.map((link) => (
-              <a
+              <Link
                 key={link.name}
-                href={link.href}
+                to={link.href}
                 className="text-sm font-medium text-gray-300 hover:text-primary transition-colors"
               >
                 {link.name}
-              </a>
+              </Link>
             ))}
           </nav>
           <div className="hidden md:flex items-center gap-4">
@@ -375,14 +381,14 @@ export default function App() {
           <div className="md:hidden bg-background/80 backdrop-blur-lg">
             <nav className="flex flex-col items-center space-y-4 p-4">
               {navLinks.map((link) => (
-                <a
+                <Link
                   key={link.name}
-                  href={link.href}
+                  to={link.href}
                   className="text-lg font-medium text-gray-300 hover:text-primary transition-colors"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   {link.name}
-                </a>
+                </Link>
               ))}
               <div className="flex flex-col w-full items-center gap-4 pt-4 border-t border-white/10">
                 <Link to="/login">
@@ -586,107 +592,164 @@ export default function App() {
             ))}
           </Accordion>
         </section>
+      </main>
 
-        <section className="my-20 md:my-28">
-          <div className="relative rounded-2xl p-10 md:p-16 text-center overflow-hidden bg-gradient-to-r from-gray-900 to-black border border-white/10">
-            <div className="absolute top-0 left-0 w-full h-full bg-[url('https/www.transparenttextures.com/patterns/grid.png')] opacity-5"></div>
-            <h2 className="text-3xl md:text-4xl font-bold">
-              Ready to Unlock Your Data's Potential?
+      <footer className="bg-background text-gray-300 relative overflow-hidden">
+        {/* Subtle background grid pattern */}
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+PHJlY3Qgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIiBmaWxsPSJ0cmFuc3BhcmVudCIvPjxjaXJjbGUgY3g9IjEwIiBjeT0iMTAiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiLz48L3N2Zz4=')] opacity-100"></div>
+
+        <div className="container mx-auto px-4 md:px-6 relative z-10">
+          {/* Call to Action Section */}
+          <div className="py-16 text-center">
+            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white">
+              Ready to Transform Your Data?
             </h2>
-            <p className="mt-4 max-w-xl mx-auto text-gray-400">
-              Join now and start transforming your MongoDB data into actionable
-              insights in minutes.
+            <p className="mt-4 max-w-2xl mx-auto text-gray-400">
+              Start analyzing your MongoDB data with the power of AI. Get
+              valuable insights in seconds, not hours.
             </p>
             <div className="mt-8">
               <Link to="/signup">
-                <Button className="text-lg px-8 py-4 bg-white text-black hover:bg-gray-200">
-                  Sign Up for Free
-                  <ArrowRight className="ml-2 h-5 w-5" />
+                <Button className="h-12 px-8 text-base font-semibold bg-white text-black hover:bg-gray-200">
+                  Get Started for Free <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
             </div>
           </div>
-        </section>
-      </main>
 
-      <footer className="border-t border-white/10">
-        <div className="container mx-auto grid grid-cols-1 md:grid-cols-4 gap-8 py-12 px-4 md:px-6 text-sm">
-          <div className="flex flex-col gap-4 items-start">
-            <a href="#" className="flex items-center gap-2">
-              <Database className="h-6 w-6 text-primary" />
-              <span className="text-xl font-bold">IntelliQuery</span>
-            </a>
-            <p className="text-gray-400">AI Data Analyst for MongoDB</p>
-            <div className="flex gap-4 mt-2">
-              <a href="#" className="text-gray-400 hover:text-white">
-                <Github className="h-5 w-5" />
-              </a>
-              <a href="#" className="text-gray-400 hover:text-white">
-                <Twitter className="h-5 w-5" />
-              </a>
-              <a href="#" className="text-gray-400 hover:text-white">
-                <Linkedin className="h-5 w-5" />
-              </a>
+          {/* Glowing Divider */}
+          <div className="relative h-px w-full">
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-30"></div>
+          </div>
+
+          {/* Main Footer Content */}
+          <div className="grid grid-cols-1 gap-12 py-16 md:grid-cols-12">
+            {/* Brand and Socials Column */}
+            <div className="flex flex-col items-start gap-4 md:col-span-5">
+              <IntelliQueryLogo />
+              <p className="max-w-xs text-sm text-gray-400">
+                The AI data analyst that turns natural language into powerful
+                MongoDB queries and visualizations.
+              </p>
+              <div className="flex gap-3 mt-2">
+                <Link
+                  href="https://github.com/aniket-thapa"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-gray-400 hover:text-white transition-all duration-300 ease-in-out transform hover:-translate-y-px"
+                >
+                  <Github className="h-5 w-5" />
+                </Link>
+                <Link
+                  href="#"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-gray-400 hover:text-white transition-all duration-300 ease-in-out transform hover:-translate-y-px"
+                >
+                  <Twitter className="h-5 w-5" />
+                </Link>
+                <Link
+                  href="#"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-gray-400 hover:text-white transition-all duration-300 ease-in-out transform hover:-translate-y-px"
+                >
+                  <Linkedin className="h-5 w-5" />
+                </Link>
+              </div>
+            </div>
+
+            {/* Spacer */}
+            <div className="md:col-span-1"></div>
+
+            {/* Link Columns */}
+            <div className="md:col-span-2">
+              <h4 className="font-semibold text-white mb-4">Product</h4>
+              <ul className="space-y-3 text-sm">
+                <li>
+                  <a
+                    href="#features"
+                    className="text-gray-400 hover:text-white transition-all duration-300 ease-in-out transform hover:-translate-y-px"
+                  >
+                    Features
+                  </a>
+                </li>
+                <li>
+                  <Link
+                    to="/docs"
+                    className="text-gray-400 hover:text-white transition-all duration-300 ease-in-out transform hover:-translate-y-px"
+                  >
+                    Documentation
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            <div className="md:col-span-2">
+              <h4 className="font-semibold text-white mb-4">Company</h4>
+              <ul className="space-y-3 text-sm">
+                <li>
+                  <Link
+                    to="/about"
+                    className="text-gray-400 hover:text-white transition-all duration-300 ease-in-out transform hover:-translate-y-px"
+                  >
+                    About
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/contact"
+                    className="text-gray-400 hover:text-white transition-all duration-300 ease-in-out transform hover:-translate-y-px"
+                  >
+                    Contact
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            <div className="md:col-span-2">
+              <h4 className="font-semibold text-white mb-4">Legal</h4>
+              <ul className="space-y-3 text-sm">
+                <li>
+                  <Link
+                    to="/privacy"
+                    className="text-gray-400 hover:text-white transition-all duration-300 ease-in-out transform hover:-translate-y-px"
+                  >
+                    Privacy Policy
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/terms"
+                    className="text-gray-400 hover:text-white transition-all duration-300 ease-in-out transform hover:-translate-y-px"
+                  >
+                    Terms of Service
+                  </Link>
+                </li>
+              </ul>
             </div>
           </div>
-          <div>
-            <h4 className="font-semibold mb-4">Product</h4>
-            <ul className="space-y-3">
-              <li>
-                <a href="#features" className="text-gray-400 hover:text-white">
-                  Features
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#quickstart"
-                  className="text-gray-400 hover:text-white"
-                >
-                  Quickstart
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-gray-400 hover:text-white">
-                  Changelog
-                </a>
-              </li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-semibold mb-4">Company</h4>
-            <ul className="space-y-3">
-              <li>
-                <a href="#" className="text-gray-400 hover:text-white">
-                  About Us
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-gray-400 hover:text-white">
-                  Contact
-                </a>
-              </li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-semibold mb-4">Legal</h4>
-            <ul className="space-y-3">
-              <li>
-                <a href="#" className="text-gray-400 hover:text-white">
-                  Privacy Policy
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-gray-400 hover:text-white">
-                  Terms of Service
-                </a>
-              </li>
-            </ul>
-          </div>
         </div>
-        <div className="border-t border-white/10 py-6">
-          <p className="text-center text-xs text-gray-500">
-            &copy; {new Date().getFullYear()} IntelliQuery. All rights reserved.
-          </p>
+
+        {/* Sub-Footer */}
+        <div className="border-t border-white/10 py-6 relative z-10">
+          <div className="container mx-auto flex flex-col items-center justify-between px-4 text-xs text-gray-500 sm:flex-row md:px-6">
+            <p>
+              &copy; {new Date().getFullYear()} IntelliQuery. All Rights
+              Reserved.
+            </p>
+            <p className="mt-2 sm:mt-0 flex items-center gap-1.5">
+              <Code className="h-4 w-4 text-gray-600" /> A project by
+              <Link
+                href="https://github.com/aniket-thapa"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-gray-400 hover:text-white transition-colors"
+              >
+                Aniket Thapa
+              </Link>
+            </p>
+          </div>
         </div>
       </footer>
     </div>
