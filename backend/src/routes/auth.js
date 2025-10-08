@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import Tenant from '../models/Tenant.js';
-import Invitation from '../models/Invitation';
+import Invitation from '../models/Invitation.js';
 import { sendEmail } from '../utils/emailService.js';
 
 const router = express.Router();
