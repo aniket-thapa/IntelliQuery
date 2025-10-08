@@ -6,7 +6,6 @@ import User from '../models/User.js';
 import Tenant from '../models/Tenant.js';
 import Invitation from '../models/Invitation';
 import { sendEmail } from '../utils/emailService.js';
-import express from 'express';
 
 const router = express.Router();
 
