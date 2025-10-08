@@ -74,7 +74,7 @@ const EmailTemplate = ({ title, bodyContent, buttonLink, buttonText }) => `
                         <td class="content">
                             <h2>${title}</h2>
                             ${bodyContent}
-                            <a href="${buttonLink}" class="button">${buttonText}</a>
+                            <a href="${buttonLink}" class="button" style="color: #ffffff;">${buttonText}</a>
                         </td>
                     </tr>
                     <tr>
