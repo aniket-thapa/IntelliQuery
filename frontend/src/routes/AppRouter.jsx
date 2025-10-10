@@ -1,87 +1,132 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+} from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import Layout from '../components/layout/Layout';
-import Home from '../pages/Home';
-import Login from '../pages/Login';
-import Signup from '../pages/Signup';
-import Dashboard from '../pages/Dashboard';
-import Chat from '../pages/Chat';
-import Integration from '../pages/Integration';
-import Onboarding from '../pages/Onboarding';
-import RequestPasswordReset from '../pages/RequestPasswordReset';
-import ResetPassword from '../pages/ResetPassword';
-import AcceptInvite from '../pages/AcceptInvite';
-import Settings from '../pages/Settings';
+import api from '../lib/api';
+import { LoaderCircle } from 'lucide-react';
+
+// Layouts
+import AppLayout from '../layouts/AppLayout';
+
+// Public Pages
+import HomePage from '../pages/public/HomePage';
+import LoginPage from '../pages/public/LoginPage';
+import SignupPage from '../pages/public/SignupPage';
+import RequestPasswordResetPage from '../pages/public/RequestPasswordResetPage';
+import ResetPasswordPage from '../pages/public/ResetPasswordPage';
+import AcceptInvitePage from '../pages/public/AcceptInvitePage';
+import NotFoundPage from '../pages/public/NotFoundPage';
+
+// App Pages
+import OnboardingPage from '../pages/app/OnboardingPage';
+import DashboardPage from '../pages/app/DashboardPage';
+import SettingsLayout from '../pages/app/settings/SettingsLayout';
+import TeamPage from '../pages/app/settings/TeamPage';
+import DatabasePage from '../pages/app/settings/DatabasePage';
+import SchemaPage from '../pages/app/settings/SchemaPage';
 
 function PrivateRoute({ children }) {
-  const { token } = useAuth();
-  return token ? children : <Navigate to="/login" replace />;
+  const { token, onboardingStatus } = useAuth();
+  const location = useLocation();
+
+  if (onboardingStatus === 'loading') {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <LoaderCircle className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!token) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+  const isFullyOnboarded = onboardingStatus === 'onboarded';
+  const isOnboardingPage = location.pathname === '/app/onboarding';
+
+  if (isFullyOnboarded && isOnboardingPage) {
+    return <Navigate to="/app/dashboard" replace />;
+  }
+
+  if (!isFullyOnboarded && !isOnboardingPage) {
+    return <Navigate to="/app/onboarding" replace />;
+  }
+
+  return children;
 }
 
 function AdminRoute({ children }) {
   const { user } = useAuth();
-  return user?.role === 'admin' || user?.role === 'developer' ? (
-    children
-  ) : (
-    <Navigate to="/dashboard" />
-  );
+  const isAdmin = user?.role === 'admin' || user?.role === 'developer';
+  return isAdmin ? children : <Navigate to="/app/dashboard" replace />;
 }
 
 export default function AppRouter() {
+  const { token } = useAuth();
+
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/forgot-password" element={<RequestPasswordReset />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/accept-invite" element={<AcceptInvite />} />
+        {/* Public Routes - redirect if logged in */}
         <Route
-          path="/dashboard"
-          element={
-            <PrivateRoute>
-              <Dashboard />
-            </PrivateRoute>
-          }
+          path="/"
+          element={token ? <Navigate to="/app" /> : <HomePage />}
         />
         <Route
-          path="/chat"
-          element={
-            <PrivateRoute>
-              <Chat />
-            </PrivateRoute>
-          }
+          path="/login"
+          element={token ? <Navigate to="/app" /> : <LoginPage />}
         />
         <Route
-          path="/settings"
+          path="/signup"
+          element={token ? <Navigate to="/app" /> : <SignupPage />}
+        />
+        <Route path="/forgot-password" element={<RequestPasswordResetPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/accept-invite" element={<AcceptInvitePage />} />
+
+        {/* --- Main Application Routes --- */}
+        <Route
+          path="/app"
           element={
             <PrivateRoute>
-              <Settings />
+              <AppLayout />
             </PrivateRoute>
           }
-        />
-        <Route
-          path="/integration"
-          element={
-            <PrivateRoute>
+        >
+          {/* Index route for /app */}
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<DashboardPage />} />
+          <Route
+            path="settings"
+            element={
               <AdminRoute>
-                <Integration />
+                <SettingsLayout />
               </AdminRoute>
-            </PrivateRoute>
-          }
-        />
+            }
+          >
+            <Route index element={<Navigate to="team" replace />} />
+            <Route path="team" element={<TeamPage />} />
+            <Route path="database" element={<DatabasePage />} />
+            <Route path="schema" element={<SchemaPage />} />
+          </Route>
+        </Route>
+
+        {/* Onboarding route is special - it's private but outside the main AppLayout */}
         <Route
-          path="/onboarding"
+          path="/app/onboarding"
           element={
             <PrivateRoute>
-              <AdminRoute>
-                <Onboarding />
-              </AdminRoute>
+              <OnboardingPage />
             </PrivateRoute>
           }
         />
-        <Route path="*" element={<Navigate to="/dashboard" />} />
+
+        {/* Fallback route */}
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
   );

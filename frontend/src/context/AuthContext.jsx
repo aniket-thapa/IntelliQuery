@@ -1,4 +1,10 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from 'react';
 import api from '../lib/api';
 
 const AuthContext = createContext();
@@ -10,39 +16,66 @@ export const AuthProvider = ({ children }) => {
   });
   const [token, setToken] = useState(localStorage.getItem('token') || null);
 
+  // --- NEW STATE for Onboarding ---
+  // 'loading': We haven't checked yet.
+  // 'onboarded': User has completed all steps.
+  // 'incomplete': User has started but not finished.
+  const [onboardingStatus, setOnboardingStatus] = useState('loading');
+
+  const checkOnboardingStatus = useCallback(async () => {
+    if (!localStorage.getItem('token')) {
+      setOnboardingStatus('incomplete');
+      return;
+    }
+    try {
+      const res = await api.get('/onboarding/status');
+      if (res.data.isOnboarded) {
+        setOnboardingStatus('onboarded');
+      } else {
+        setOnboardingStatus('incomplete');
+      }
+      return res.data;
+    } catch (err) {
+      console.error('Failed to check onboarding status', err);
+      // Default to incomplete on error to be safe
+      setOnboardingStatus('incomplete');
+      return { isOnboarded: false };
+    }
+  }, []);
+
   useEffect(() => {
     if (token) {
       localStorage.setItem('token', token);
-      fetchProfile();
+      // Fetch user profile and onboarding status when token is available
+      api
+        .get('/user/me')
+        .then((res) => {
+          if (res.data.status) setUser(res.data.user);
+        })
+        .catch((err) => {
+          console.error('Profile fetch error:', err);
+          logout(); // Log out if token is invalid
+        });
+      checkOnboardingStatus();
     } else {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       setUser(null);
+      setOnboardingStatus('incomplete'); // Not onboarded if not logged in
     }
-  }, [token]);
+  }, [token, checkOnboardingStatus]);
 
-  // Persist user to localStorage whenever it changes
   useEffect(() => {
     if (user) {
       localStorage.setItem('user', JSON.stringify(user));
     }
   }, [user]);
 
-  const fetchProfile = async () => {
-    try {
-      const res = await api.get('/user/me');
-      if (res.data.status) setUser(res.data.user);
-    } catch (err) {
-      console.error('Profile fetch error:', err);
-      setToken(null);
-    }
-  };
-
   const login = (data) => {
     setToken(data.token);
     setUser(data.user);
-    localStorage.setItem('user', JSON.stringify(data.user));
-    localStorage.setItem('token', data.token);
+    // After login, immediately check onboarding status
+    checkOnboardingStatus();
   };
 
   const logout = () => {
@@ -52,8 +85,23 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('token');
   };
 
+  // --- NEW FUNCTION to manually update status ---
+  const completeOnboarding = () => {
+    setOnboardingStatus('onboarded');
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        login,
+        logout,
+        onboardingStatus,
+        checkOnboardingStatus,
+        completeOnboarding,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

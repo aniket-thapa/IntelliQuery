@@ -30,7 +30,6 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { Input } from '@/components/ui/input';
 
 const IntelliQueryLogo = () => {
   return (
@@ -140,31 +139,25 @@ const InteractiveDemo = () => {
                     <code>
                       <span className="text-blue-400">db.sales.aggregate</span>
                       ([
-                      <br />
-                      {'  '}
-                      {'{'}
+                      <br /> {'{'}
                       <span className="text-red-400"> $match</span>: {'{'}{' '}
                       "date": {'{'} <span className="text-red-400">$gte</span>:{' '}
                       <span className="text-green-400">new Date(...)</span>{' '}
-                      {'}'} {'}'} {'}'},<br />
-                      {'  '}
-                      {'{'}
+                      {'}'} {'}'} {'}'},<br /> {'{'}
                       <br />
-                      {'    '}
+                      {'  '}
                       <span className="text-red-400">$group</span>: {'{'}
                       <br />
-                      {'      '}_id:{' '}
+                      {'   '}_id:{' '}
                       <span className="text-green-400">"$category"</span>,<br />
-                      {'      '}totalSales: {'{'}{' '}
+                      {'   '}totalSales: {'{'}{' '}
                       <span className="text-red-400">$sum</span>:{' '}
                       <span className="text-green-400">"$amount"</span> {'}'}{' '}
                       {'}'}
                       <br />
-                      {'    '}
-                      {'}'}
-                      <br />
                       {'  '}
                       {'}'}
+                      <br /> {'}'}
                       <br />
                       ])
                     </code>
@@ -228,7 +221,7 @@ const InteractiveDemo = () => {
 };
 
 // --- Main App Component ---
-export default function App() {
+export default function HomePage() {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
 
   const navLinks = [
@@ -259,27 +252,27 @@ export default function App() {
   ];
 
   const schemaJsonExample = `{
-  "databaseName": "ecommerce_db",
-  "collections": [
-    {
-      "name": "users",
-      "description": "Stores customer information.",
-      "fields": [
-        { "name": "userId", "type": "ObjectId", "description": "Unique user identifier" },
-        { "name": "email", "type": "string", "description": "Customer's email address" },
-        { "name": "signupDate", "type": "date", "description": "When the user registered" }
-      ]
-    },
-    {
-      "name": "orders",
-      "description": "Stores information about customer orders.",
-      "fields": [
-        { "name": "orderId", "type": "ObjectId", "description": "Unique order identifier" },
-        { "name": "amount", "type": "number", "description": "Total order value" },
-        { "name": "purchaseDate", "type": "date", "description": "Date of the order" }
-      ]
-    }
-  ]
+ "databaseName": "ecommerce_db",
+ "collections": [
+  {
+   "name": "users",
+   "description": "Stores customer information.",
+   "fields": [
+    { "name": "userId", "type": "ObjectId", "description": "Unique user identifier" },
+    { "name": "email", "type": "string", "description": "Customer's email address" },
+    { "name": "signupDate", "type": "date", "description": "When the user registered" }
+   ]
+  },
+  {
+   "name": "orders",
+   "description": "Stores information about customer orders.",
+   "fields": [
+    { "name": "orderId", "type": "ObjectId", "description": "Unique order identifier" },
+    { "name": "amount", "type": "number", "description": "Total order value" },
+    { "name": "purchaseDate", "type": "date", "description": "Date of the order" }
+   ]
+  }
+ ]
 }`;
 
   const techStack = [
@@ -331,7 +324,7 @@ export default function App() {
   ];
 
   return (
-    <div className="min-h-screen w-full bg-[#020817] text-white overflow-x-hidden antialiased">
+    <div className="min-h-screen w-full bg-background text-white overflow-x-hidden antialiased">
       <div className="fixed top-0 left-0 w-full h-full -z-10 opacity-50">
         <div className="absolute top-[-20%] left-[10%] w-[500px] h-[500px] bg-purple-500/30 rounded-full filter blur-3xl animate-blob"></div>
         <div className="absolute top-[10%] right-[10%] w-[500px] h-[500px] bg-blue-500/30 rounded-full filter blur-3xl animate-blob animation-delay-2000"></div>
@@ -344,13 +337,13 @@ export default function App() {
 
           <nav className="hidden md:flex items-center gap-6">
             {navLinks.map((link) => (
-              <Link
+              <a
                 key={link.name}
-                to={link.href}
+                href={link.href}
                 className="text-sm font-medium text-gray-300 hover:text-primary transition-colors"
               >
                 {link.name}
-              </Link>
+              </a>
             ))}
           </nav>
           <div className="hidden md:flex items-center gap-4">
@@ -381,22 +374,22 @@ export default function App() {
           <div className="md:hidden bg-background/80 backdrop-blur-lg">
             <nav className="flex flex-col items-center space-y-4 p-4">
               {navLinks.map((link) => (
-                <Link
+                <a
                   key={link.name}
-                  to={link.href}
+                  href={link.href}
                   className="text-lg font-medium text-gray-300 hover:text-primary transition-colors"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   {link.name}
-                </Link>
+                </a>
               ))}
               <div className="flex flex-col w-full items-center gap-4 pt-4 border-t border-white/10">
-                <Link to="/login">
+                <Link to="/login" className="w-full">
                   <Button variant="ghost" className="w-full">
                     Login
                   </Button>
                 </Link>
-                <Link to="/signup">
+                <Link to="/signup" className="w-full">
                   <Button className="bg-white text-black hover:bg-gray-200 w-full">
                     Get Started Free
                   </Button>
@@ -594,12 +587,8 @@ export default function App() {
         </section>
       </main>
 
-      <footer className="bg-background text-gray-300 relative overflow-hidden">
-        {/* Subtle background grid pattern */}
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+PHJlY3Qgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIiBmaWxsPSJ0cmFuc3BhcmVudCIvPjxjaXJjbGUgY3g9IjEwIiBjeT0iMTAiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiLz48L3N2Zz4=')] opacity-100"></div>
-
+      <footer className="bg-background/50 border-t border-white/10 relative overflow-hidden">
         <div className="container mx-auto px-4 md:px-6 relative z-10">
-          {/* Call to Action Section */}
           <div className="py-16 text-center">
             <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white">
               Ready to Transform Your Data?
@@ -617,14 +606,11 @@ export default function App() {
             </div>
           </div>
 
-          {/* Glowing Divider */}
           <div className="relative h-px w-full">
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-30"></div>
           </div>
 
-          {/* Main Footer Content */}
           <div className="grid grid-cols-1 gap-12 py-16 md:grid-cols-12">
-            {/* Brand and Socials Column */}
             <div className="flex flex-col items-start gap-4 md:col-span-5">
               <IntelliQueryLogo />
               <p className="max-w-xs text-sm text-gray-400">
@@ -632,106 +618,19 @@ export default function App() {
                 MongoDB queries and visualizations.
               </p>
               <div className="flex gap-3 mt-2">
-                <Link
+                <a
                   href="https://github.com/aniket-thapa"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-gray-400 hover:text-white transition-all duration-300 ease-in-out transform hover:-translate-y-px"
+                  className="text-gray-400 hover:text-white transition-all duration-300"
                 >
                   <Github className="h-5 w-5" />
-                </Link>
-                <Link
-                  href="#"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-gray-400 hover:text-white transition-all duration-300 ease-in-out transform hover:-translate-y-px"
-                >
-                  <Twitter className="h-5 w-5" />
-                </Link>
-                <Link
-                  href="#"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-gray-400 hover:text-white transition-all duration-300 ease-in-out transform hover:-translate-y-px"
-                >
-                  <Linkedin className="h-5 w-5" />
-                </Link>
+                </a>
               </div>
-            </div>
-
-            {/* Spacer */}
-            <div className="md:col-span-1"></div>
-
-            {/* Link Columns */}
-            <div className="md:col-span-2">
-              <h4 className="font-semibold text-white mb-4">Product</h4>
-              <ul className="space-y-3 text-sm">
-                <li>
-                  <a
-                    href="#features"
-                    className="text-gray-400 hover:text-white transition-all duration-300 ease-in-out transform hover:-translate-y-px"
-                  >
-                    Features
-                  </a>
-                </li>
-                <li>
-                  <Link
-                    to="/docs"
-                    className="text-gray-400 hover:text-white transition-all duration-300 ease-in-out transform hover:-translate-y-px"
-                  >
-                    Documentation
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            <div className="md:col-span-2">
-              <h4 className="font-semibold text-white mb-4">Company</h4>
-              <ul className="space-y-3 text-sm">
-                <li>
-                  <Link
-                    to="/about"
-                    className="text-gray-400 hover:text-white transition-all duration-300 ease-in-out transform hover:-translate-y-px"
-                  >
-                    About
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to="/contact"
-                    className="text-gray-400 hover:text-white transition-all duration-300 ease-in-out transform hover:-translate-y-px"
-                  >
-                    Contact
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            <div className="md:col-span-2">
-              <h4 className="font-semibold text-white mb-4">Legal</h4>
-              <ul className="space-y-3 text-sm">
-                <li>
-                  <Link
-                    to="/privacy"
-                    className="text-gray-400 hover:text-white transition-all duration-300 ease-in-out transform hover:-translate-y-px"
-                  >
-                    Privacy Policy
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to="/terms"
-                    className="text-gray-400 hover:text-white transition-all duration-300 ease-in-out transform hover:-translate-y-px"
-                  >
-                    Terms of Service
-                  </Link>
-                </li>
-              </ul>
             </div>
           </div>
         </div>
 
-        {/* Sub-Footer */}
         <div className="border-t border-white/10 py-6 relative z-10">
           <div className="container mx-auto flex flex-col items-center justify-between px-4 text-xs text-gray-500 sm:flex-row md:px-6">
             <p>
@@ -739,15 +638,15 @@ export default function App() {
               Reserved.
             </p>
             <p className="mt-2 sm:mt-0 flex items-center gap-1.5">
-              <Code className="h-4 w-4 text-gray-600" /> A project by
-              <Link
+              A project by
+              <a
                 href="https://github.com/aniket-thapa"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-medium text-gray-400 hover:text-white transition-colors"
               >
                 Aniket Thapa
-              </Link>
+              </a>
             </p>
           </div>
         </div>

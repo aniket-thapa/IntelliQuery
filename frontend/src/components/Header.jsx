@@ -1,3 +1,4 @@
+// src/components/Header.jsx
 import { useAuth } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -108,6 +109,10 @@ export default function Header() {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => navigate('/account')}>
+                  <LayoutDashboard className="mr-2 h-4 w-4" />
+                  <span>Account</span>
+                </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => navigate('/dashboard')}>
                   <LayoutDashboard className="mr-2 h-4 w-4" />
                   <span>Dashboard</span>
