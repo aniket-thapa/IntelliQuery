@@ -2,6 +2,7 @@
 import express from 'express';
 import Integration from '../models/Integration.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { encrypt, decrypt } from '../utils/crypto.js';
 
 const router = express.Router();
 
@@ -33,14 +34,18 @@ router.post('/', authMiddleware, async (req, res) => {
       });
     }
 
+    const encryptedUri = encrypt(connectionUri);
+
     const integration = new Integration({
       tenantId,
       type: 'mongodb',
-      connectionUri,
+      connectionUri: encryptedUri,
       dbName,
     });
 
     await integration.save();
+
+    integration.connectionUri = decrypt(integration.connectionUri);
 
     res.status(201).json({ status: true, integration });
   } catch (err) {
@@ -50,21 +55,23 @@ router.post('/', authMiddleware, async (req, res) => {
 });
 
 /**
- * @route   GET /api/integration/:tenantId
+ * @route   GET /api/integration
  * @desc    Get integrations for a tenant
  */
-router.get('/:tenantId', authMiddleware, async (req, res) => {
+router.get('/', authMiddleware, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res
         .status(403)
         .json({ status: false, error: 'Unauthorized access.' });
     }
-    const integrations = await Integration.find({
-      tenantId: req.params.tenantId,
+    const integration = await Integration.findOne({
+      tenantId: req.user.tenantId,
     });
 
-    res.json({ status: true, integrations });
+    integration.connectionUri = decrypt(integration.connectionUri);
+
+    res.json({ status: true, integration });
   } catch (err) {
     console.error('Fetch Integration Error:', err);
     res.status(500).json({ status: false, error: err.message });
@@ -72,12 +79,18 @@ router.get('/:tenantId', authMiddleware, async (req, res) => {
 });
 
 /**
- * @route   PUT /api/integration/:id
+ * @route   PUT /api/integration/
  * @desc    Update integration details
  */
-router.put('/:id', authMiddleware, async (req, res) => {
+router.put('/', authMiddleware, async (req, res) => {
   try {
     const { connectionUri, dbName, status } = req.body;
+
+    if (!req.user.tenantId) {
+      return res
+        .status(400)
+        .json({ status: false, error: "Doesn't belongs to the tenant." });
+    }
 
     if (req.user.role !== 'admin') {
       return res
@@ -85,17 +98,28 @@ router.put('/:id', authMiddleware, async (req, res) => {
         .json({ status: false, error: 'Unauthorized access.' });
     }
 
-    const integration = await Integration.findByIdAndUpdate(
-      req.params.id,
-      { connectionUri, dbName, status },
+    if (!connectionUri || !dbName || !status) {
+      return res.status(400).json({
+        status: false,
+        error: 'connectionUri, dbName and status required',
+      });
+    }
+
+    const encryptedUri = encrypt(connectionUri);
+
+    const integration = await Integration.findOneAndUpdate(
+      { tenantId: req.user.tenantId },
+      { connectionUri: encryptedUri, dbName, status },
       { new: true }
     );
 
     if (!integration) {
       return res
         .status(404)
-        .json({ status: false, error: 'Integration not found' });
+        .json({ status: false, error: 'Integration not found', integration });
     }
+
+    integration.connectionUri = decrypt(integration.connectionUri);
 
     res.json({ status: true, integration });
   } catch (err) {
