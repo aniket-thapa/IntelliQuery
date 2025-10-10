@@ -98,7 +98,7 @@ router.post('/invite', authMiddleware, async (req, res) => {
 
     // 4. Send the email
     const inviteLink = `${process.env.APP_URL}/accept-invite?token=${inviteToken}`;
-    await sendEmail(email, 'You are invited!', inviteLink);
+    await sendEmail(email, 'invite', inviteLink);
 
     res.status(200).json({
       status: true,
