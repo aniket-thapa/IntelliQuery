@@ -1,6 +1,7 @@
 // backend/src/routes/integration.js
 import express from 'express';
 import Integration from '../models/Integration.js';
+import { MongoClient } from 'mongodb';
 import { authMiddleware } from '../middleware/auth.js';
 import { encrypt, decrypt } from '../utils/crypto.js';
 
@@ -11,6 +12,7 @@ const router = express.Router();
  * @desc    Add MongoDB integration for a tenant
  */
 router.post('/', authMiddleware, async (req, res) => {
+  console.log(req.body);
   try {
     const { tenantId, connectionUri, dbName } = req.body;
 
@@ -34,6 +36,22 @@ router.post('/', authMiddleware, async (req, res) => {
       });
     }
 
+    // --- Verify MongoDB Connection ---
+    const client = new MongoClient(connectionUri, {
+      serverSelectionTimeoutMS: 5000, // 5 seconds timeout
+    });
+
+    try {
+      await client.connect();
+      await client.db(dbName).command({ ping: 1 }); // Simple ping to check connection
+    } catch (err) {
+      return res
+        .status(400)
+        .json({ status: false, error: 'Invalid MongoDB connection URL.' });
+    } finally {
+      await client.close();
+    }
+    // --- Save Encrypted URI ---
     const encryptedUri = encrypt(connectionUri);
 
     const integration = new Integration({

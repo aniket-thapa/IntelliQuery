@@ -2,6 +2,7 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 import User from '../models/User.js';
 import Tenant from '../models/Tenant.js';
 import Invitation from '../models/Invitation.js';
@@ -158,6 +159,8 @@ router.post('/reset-password', async (req, res) => {
 router.post('/accept-invite', async (req, res) => {
   const { token, password } = req.body;
 
+  console.log();
+
   if (!token) {
     return res.status(400).json({ status: false, error: 'Token is required' });
   }
@@ -165,6 +168,8 @@ router.post('/accept-invite', async (req, res) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const { email, name, tenantId, role, jti } = decoded;
+
+    console.log();
 
     const invitation = await Invitation.findOne({ tokenIdentifier: jti });
 
@@ -201,6 +206,9 @@ router.post('/accept-invite', async (req, res) => {
         }
         const passwordHash = await bcrypt.hash(password, 10);
         const newUser = new User({ name, email, passwordHash, role, tenantId });
+
+        console.log('newUser', newUser);
+
         await newUser.save({ session });
 
         const tenant = await Tenant.findById(tenantId).session(session);
@@ -239,7 +247,7 @@ router.post('/accept-invite', async (req, res) => {
         .status(400)
         .json({ status: false, error: 'Invalid invitation link.' });
     }
-    console.error('Accept invite error:', err.message);
+    console.error('Accept invite error:', err);
     res
       .status(500)
       .json({ status: false, error: 'An unexpected error occurred.' });

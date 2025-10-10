@@ -1,12 +1,49 @@
 // backend/src/routes/onboarding.js
 import express from 'express';
 import DatabaseSchema from '../models/DatabaseSchema.js';
+import Integration from '../models/Integration.js';
 import Tenant from '../models/Tenant.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 import { processSchemaEmbeddings } from '../utils/embeddingService.js';
 
 const router = express.Router();
+
+/**
+ * @route   GET /api/onboarding/status
+ * @desc    Check if the tenant has completed the onboarding process
+ * @access  Private
+ */
+router.get('/status', authMiddleware, async (req, res) => {
+  try {
+    const { tenantId } = req.user;
+    if (!tenantId) {
+      return res
+        .status(400)
+        .json({ status: false, error: 'User is not part of a tenant.' });
+    }
+
+    // Check for both integration and schema in parallel for efficiency
+    const [integration, schema] = await Promise.all([
+      Integration.findOne({ tenantId }),
+      DatabaseSchema.findOne({ tenantId }),
+    ]);
+
+    const progress = {
+      hasConnectedDb: !!integration,
+      hasProvidedSchema: !!schema,
+    };
+
+    res.json({
+      status: true,
+      isOnboarded: progress.hasConnectedDb && progress.hasProvidedSchema,
+      progress,
+    });
+  } catch (err) {
+    console.error('Onboarding status error:', err.message);
+    res.status(500).json({ status: false, error: 'Server error' });
+  }
+});
 
 // Upload database schema JSON
 router.post('/schema', authMiddleware, async (req, res) => {
