@@ -13,7 +13,7 @@ import { useAuth } from '../../context/AuthContext';
 import api from '../../lib/api';
 import { toast } from 'sonner';
 // We will create this component next
-// import AIMessage from '../../components/chat/AIMessage';
+import AIMessage from '../../components/chat/AIMessage';
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -21,6 +21,7 @@ export default function DashboardPage() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const scrollAreaRef = useRef(null);
+  const lastMessageRef = useRef(null);
 
   // Fetch initial chat history
   useEffect(() => {
@@ -64,6 +65,13 @@ export default function DashboardPage() {
     }
   };
 
+  useEffect(() => {
+    if (lastMessageRef.current) {
+      // Scroll into view smoothly
+      lastMessageRef.current.scrollIntoView({ behavior: 'auto' });
+    }
+  }, [messages]);
+
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -90,15 +98,13 @@ export default function DashboardPage() {
             isUser ? 'bg-primary text-primary-foreground' : 'bg-muted'
           }`}
         >
-          {
-            isError ? (
-              <p className="text-destructive">{msg.error}</p>
-            ) : isUser ? (
-              <p className="whitespace-pre-wrap">{msg.text}</p>
-            ) : (
-              'AIMessage Placeholder'
-            ) /*<AIMessage data={msg} />*/
-          }
+          {isError ? (
+            <p className="text-destructive">{msg.error}</p>
+          ) : isUser ? (
+            <p className="whitespace-pre-wrap">{msg.text}</p>
+          ) : (
+            <AIMessage data={msg} />
+          )}
         </div>
         {isUser && (
           <Avatar>
@@ -127,7 +133,14 @@ export default function DashboardPage() {
               </p>
             </div>
           ) : (
-            messages.map((msg, index) => <Message key={index} msg={msg} />)
+            messages.map((msg, index) => (
+              <div
+                key={index}
+                ref={index === messages.length - 1 ? lastMessageRef : null}
+              >
+                <Message key={index} msg={msg} />
+              </div>
+            ))
           )}
           {isLoading && (
             <div className="flex items-start gap-4">

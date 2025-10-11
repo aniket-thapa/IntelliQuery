@@ -11,7 +11,9 @@ import { Database } from 'lucide-react';
 import ChartRenderer from './ChartRenderer';
 
 export default function AIMessage({ data }) {
-  const { finalAnswer, tableData, mongoQuery } = data;
+  let { finalAnswer, tableData, mongoQuery } = data?.data || data || {};
+
+  if (!finalAnswer) finalAnswer = data?.text; // No result found case
 
   return (
     <div className="space-y-4">
