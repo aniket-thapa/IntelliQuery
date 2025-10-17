@@ -30,7 +30,7 @@ export default function DatabasePage() {
       if (res.data.integration) {
         setIntegration(res.data.integration);
         setForm({
-          connectionUri: res.data.integration.connectionUri,
+          connectionUri: '', // Clear the URI for security
           dbName: res.data.integration.dbName,
         });
       }
@@ -42,7 +42,7 @@ export default function DatabasePage() {
   };
 
   const maskUri = (uri) => {
-    if (!uri || uri.length < 20) return uri;
+    if (!uri || uri.length < 20) return 'mongodb+srv://...';
     return `${uri.substring(0, 15)}...${uri.substring(uri.length - 15)}`;
   };
 
@@ -50,7 +50,13 @@ export default function DatabasePage() {
     e.preventDefault();
     setIsUpdating(true);
     try {
-      await api.put('/integration', { ...form, status: 'active' });
+      // Only submit the URI if it has been changed
+      const payload = { ...form, status: 'active' };
+      if (!form.connectionUri) {
+        delete payload.connectionUri;
+      }
+
+      await api.put('/integration', payload);
       toast.success('Database settings updated successfully!');
       fetchIntegration(); // Refresh data
     } catch (error) {
@@ -80,23 +86,24 @@ export default function DatabasePage() {
             Manage your MongoDB connection settings.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
             <Label htmlFor="connectionUri">Connection URI</Label>
             <Input
               id="connectionUri"
+              type="password"
               value={form.connectionUri}
               onChange={(e) =>
                 setForm({ ...form, connectionUri: e.target.value })
               }
               placeholder={maskUri(integration?.connectionUri)}
             />
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-muted-foreground">
               Your current URI is masked for security. To update, paste the new
               full URI here.
             </p>
           </div>
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="dbName">Database Name</Label>
             <Input
               id="dbName"

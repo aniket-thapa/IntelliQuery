@@ -2,6 +2,8 @@ import React from 'react';
 import { TypeAnimation } from 'react-type-animation';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import {
   BarChart3,
   ArrowRight,
@@ -560,10 +562,29 @@ export default function HomePage() {
               example:
             </p>
           </div>
-          <div className="relative max-w-4xl mx-auto">
+          <div className="relative max-w-[50rem] mx-auto">
             <div className="absolute -inset-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl blur-lg opacity-20"></div>
             <pre className="relative p-6 bg-black/80 border border-white/20 rounded-lg text-sm text-white overflow-x-auto">
-              <code>{schemaJsonExample}</code>
+              <code>
+                <SyntaxHighlighter
+                  language="json"
+                  style={{
+                    ...oneDark,
+                    'code[class*="language-"]': {
+                      ...oneDark['code[class*="language-"]'],
+                      background: 'transparent',
+                    },
+                  }}
+                  customStyle={{
+                    margin: 0,
+                    padding: 0,
+                    background: 'transparent',
+                    fontSize: '0.9rem',
+                  }}
+                >
+                  {schemaJsonExample}
+                </SyntaxHighlighter>
+              </code>
             </pre>
           </div>
         </section>
