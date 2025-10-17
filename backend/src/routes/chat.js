@@ -7,9 +7,9 @@ import Chat from '../models/Chat.js';
 const router = express.Router();
 
 // POST /api/chat
-router.post('/', authMiddleware, async (req, res) => {
+router.get('/', authMiddleware, async (req, res) => {
   try {
-    const { query } = req.body;
+    const { query } = req.query;
 
     if (!query) {
       return res
@@ -32,25 +32,41 @@ router.post('/', authMiddleware, async (req, res) => {
     chatDoc.messages.push({ sender: 'user', text: query });
     await chatDoc.save();
 
+    // Recent Messages
     const recent = chatDoc.messages.slice(-10).map((m) => ({
       sender: m.sender,
       text: m.sender === 'agent' ? m.data.mongoQuery : m.text,
     }));
 
+    // Set headers for SSE
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
     // invoke agent
     const agent = buildAgent();
-    const stateOut = await agent.invoke({
+
+    const stream = await agent.stream({
       tenantId,
       userQuery: query,
       recentMessages: recent,
     });
 
-    const finalAnswer =
-      stateOut?.finalAnswer ||
-      "I'm sorry, I couldn't process your request at this time.";
-    const tableData = stateOut?.tableData ?? null;
-    const mongoQuery = stateOut?.mongoQuery ?? null;
-    const schemaContext = stateOut?.schemaContext ?? null;
+    let finalState = {};
+    for await (const chunk of stream) {
+      const stepName = Object.keys(chunk)[0];
+      const stepOutput = chunk[stepName];
+
+      // Send an update for each step
+      res.write(
+        `data: ${JSON.stringify({ step: stepName, data: stepOutput })}\n\n`
+      );
+
+      finalState = { ...finalState, ...stepOutput };
+    }
+
+    // Once the stream is finished, save the final agent response to the database
+    const { finalAnswer, tableData, mongoQuery, schemaContext } = finalState;
 
     // append agent response
     chatDoc.messages.push({
@@ -68,10 +84,26 @@ router.post('/', authMiddleware, async (req, res) => {
     });
     await chatDoc.save();
 
-    return res.json({ status: true, finalAnswer, tableData, mongoQuery });
+    chatDoc.messages.push({
+      sender: 'agent',
+      text:
+        typeof finalAnswer === 'string'
+          ? finalAnswer
+          : JSON.stringify(finalAnswer),
+      data: {
+        mongoQuery,
+        schemaContext,
+        rawResult: tableData?.rows || null,
+        tableData,
+      },
+    });
+    await chatDoc.save();
+
+    res.end(); // End the stream
   } catch (err) {
     console.error('Chat route error:', err);
-    return res.status(500).json({ status: false, error: err.message });
+    res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
+    res.end();
   }
 });
 
@@ -105,27 +137,25 @@ router.delete('/messages/:messageId', authMiddleware, async (req, res) => {
     const { messageId } = req.params;
     const userId = req.user.id;
 
-    // Find the user's chat document
-    const chatDoc = await Chat.findOne({ userId });
-    if (!chatDoc) {
-      return res.status(404).json({ status: false, error: 'Chat not found' });
-    }
-
-    // Find the index of the message to delete
-    const idx = chatDoc.messages.findIndex(
-      (msg) => msg._id.toString() === messageId
-    );
-    if (idx === -1) {
+    if (!mongoose.Types.ObjectId.isValid(messageId)) {
       return res
-        .status(404)
-        .json({ status: false, error: 'Message not found' });
+        .status(400)
+        .json({ status: false, error: 'Invalid message ID format' });
+    } // Use the atomic $pull operator to remove the message directly in the database
+
+    const updateResult = await Chat.updateOne(
+      { userId },
+      { $pull: { messages: { _id: new mongoose.Types.ObjectId(messageId) } } }
+    );
+
+    if (updateResult.modifiedCount === 0) {
+      return res.status(404).json({
+        status: false,
+        error: 'Message not found or you do not have permission to delete it',
+      });
     }
 
-    // Remove the message
-    chatDoc.messages.splice(idx, 1);
-    await chatDoc.save();
-
-    return res.json({ status: true, message: 'Message deleted' });
+    return res.json({ status: true, message: 'Message deleted successfully' });
   } catch (err) {
     console.error('Delete message error:', err);
     res.status(500).json({ status: false, error: 'Internal server error' });
