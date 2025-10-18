@@ -75,7 +75,7 @@ router.post('/invite', authMiddleware, async (req, res) => {
     // 2. Create the JWT. The payload is stateless and contains all necessary info.
     const inviteToken = jwt.sign(
       {
-        tenantId: tenant._id,
+        tenantId,
         email,
         name,
         inviterName,
