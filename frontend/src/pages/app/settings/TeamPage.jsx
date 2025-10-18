@@ -49,6 +49,8 @@ export default function TeamPage() {
   const [tenant, setTenant] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isInviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [memberToEdit, setMemberToEdit] = useState(null);
+  const [memberToRemove, setMemberToRemove] = useState(null);
 
   useEffect(() => {
     fetchTenant();
@@ -60,6 +62,7 @@ export default function TeamPage() {
       setTenant(res.data.tenant);
     } catch (error) {
       toast.error('Failed to fetch team members.');
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -153,6 +156,140 @@ export default function TeamPage() {
     );
   };
 
+  /**
+   * Dialog for changing a member's role
+   */
+  const ChangeRoleDialog = () => {
+    const [newRole, setNewRole] = useState(memberToEdit?.role || 'member');
+    const [isUpdating, setUpdating] = useState(false);
+
+    const handleUpdateRole = async (e) => {
+      e.preventDefault();
+      if (!memberToEdit) return;
+      setUpdating(true);
+
+      try {
+        // Use the PUT /api/user/:id route
+        await api.put(`/user/${memberToEdit._id}`, { role: newRole });
+        toast.success('Role updated successfully.');
+        setMemberToEdit(null); // Close dialog
+        fetchTenant(); // Refresh list
+      } catch (error) {
+        toast.error('Update Failed', {
+          description: error.response?.data?.error || 'Could not update role.',
+        });
+      } finally {
+        setUpdating(false);
+      }
+    };
+
+    return (
+      <Dialog open={!!memberToEdit} onOpenChange={() => setMemberToEdit(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change role for {memberToEdit?.name}</DialogTitle>
+            <DialogDescription>
+              Select a new role for {memberToEdit?.email}.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdateRole} className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="new-role">Role</Label>
+              <Select id="new-role" value={newRole} onValueChange={setNewRole}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="member">Member</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="ghost"
+                onClick={() => setMemberToEdit(null)}
+                type="button"
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isUpdating}>
+                {isUpdating && (
+                  <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
+  /**
+   * Dialog for confirming member removal
+   */
+  const RemoveMemberDialog = () => {
+    const [isRemoving, setRemoving] = useState(false);
+
+    const handleRemove = async () => {
+      if (!memberToRemove) return;
+      setRemoving(true);
+
+      try {
+        // Use the DELETE /api/user/:id route
+        await api.delete(`/user/${memberToRemove._id}`);
+        toast.success('Member removed successfully.');
+        setMemberToRemove(null); // Close dialog
+        fetchTenant(); // Refresh list
+      } catch (error) {
+        toast.error('Remove Failed', {
+          description:
+            error.response?.data?.error || 'Could not remove member.',
+        });
+      } finally {
+        setRemoving(false);
+      }
+    };
+
+    return (
+      <Dialog
+        open={!!memberToRemove}
+        onOpenChange={() => setMemberToRemove(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Are you sure?</DialogTitle>
+            <DialogDescription>
+              This will remove <strong>{memberToRemove?.name}</strong> from the
+              workspace. They will no longer have access. This action cannot be
+              undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setMemberToRemove(null)}
+              disabled={isRemoving}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleRemove}
+              disabled={isRemoving}
+            >
+              {isRemoving && (
+                <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Remove Member
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -189,22 +326,32 @@ export default function TeamPage() {
                     <TableCell>{member.email}</TableCell>
                     <TableCell className="capitalize">{member.role}</TableCell>
                     <TableCell className="text-right">
-                      {member._id !== tenant.ownerId && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <span className="sr-only">Open menu</span>
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>Change role</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">
-                              Remove
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
+                      {member._id !== tenant.ownerId &&
+                        tenant.ownerId === user._id && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <span className="sr-only">Open menu</span>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {/* Trigger for Change Role Dialog */}
+                              <DropdownMenuItem
+                                onSelect={() => setMemberToEdit(member)}
+                              >
+                                Change role
+                              </DropdownMenuItem>
+                              {/* Trigger for Remove Member Dialog */}
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onSelect={() => setMemberToRemove(member)}
+                              >
+                                Remove
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -213,6 +360,11 @@ export default function TeamPage() {
           </div>
         )}
       </CardContent>
+
+      {/* Render the dialogs */}
+      {/* They will be invisible until their respective state is set */}
+      <ChangeRoleDialog />
+      <RemoveMemberDialog />
     </Card>
   );
 }
