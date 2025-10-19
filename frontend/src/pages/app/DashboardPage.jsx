@@ -363,7 +363,7 @@ const ChatMessageComponent = ({ message, onDelete }) => {
   const rows = tableData?.rows;
   // --- END FIX ---
 
-  const messageClass = `group relative flex gap-4 px-6 py-6 animate-in fade-in slide-in-from-bottom-4 duration-500 ${
+  const messageClass = `group relative flex gap-4 px-4 py-5 sm:px-6 sm:py-6 animate-in fade-in slide-in-from-bottom-4 duration-500 ${
     isAgent ? 'bg-muted/30' : ''
   }`;
   const avatarClass = `flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
@@ -548,7 +548,7 @@ const renderCellContent = (value, columnConfig) => {
 const StreamingMessageComponent = ({ currentStep, partialAnswer }) => {
   // ...(keep the existing StreamingMessageComponent function from the previous response)...
   const messageClass =
-    'flex gap-4 px-6 py-6 bg-muted/30 animate-in fade-in slide-in-from-bottom-4 duration-500';
+    'flex gap-4 px-4 py-5 sm:px-6 sm:py-6 bg-muted/30 animate-in fade-in slide-in-from-bottom-4 duration-500';
   const avatarClass =
     'flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center';
   const stepClass =
@@ -701,7 +701,7 @@ export default function DashboardPage() {
         onScroll={handleScroll}
         ref={scrollAreaRef}
       >
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4">
           {/* Load More Indicator */}
           {hasMore && (
             <div className="flex justify-center py-4">
@@ -728,7 +728,7 @@ export default function DashboardPage() {
           )}
           {/* Messages */}
           {messages.length === 0 && !isStreaming && !isLoadingMore ? (
-            <div className="flex flex-col items-center justify-center pt-20 pb-10 px-6 text-center">
+            <div className="flex flex-col items-center justify-center pt-20 pb-10 text-center">
               <div className="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-5">
                 <Bot className="w-8 h-8 text-primary" />
               </div>
@@ -764,7 +764,7 @@ export default function DashboardPage() {
       {/* Input Area */}
       <div className="border-t border-border bg-card/95 backdrop-blur-sm sticky bottom-0">
         {isStreaming && (
-          <div className="max-w-4xl mx-auto px-6 pt-2 flex justify-center">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-2 flex justify-center">
             <Button
               variant="outline"
               size="sm"
@@ -776,7 +776,7 @@ export default function DashboardPage() {
             </Button>
           </div>
         )}
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3">
           <div className="flex items-end gap-2">
             <div className="flex-1 relative">
               <Input // Using Input component, assuming it can render as textarea
