@@ -3,45 +3,57 @@ import express from 'express';
 import { buildAgent } from '../langgraph/agent.js';
 import { authMiddleware } from '../middleware/auth.js';
 import Chat from '../models/Chat.js';
+import mongoose from 'mongoose'; // <-- Import mongoose if not already
 
 const router = express.Router();
 
-// POST /api/chat
+// POST /api/chat (using GET with query param for EventSource)
 router.get('/', authMiddleware, async (req, res) => {
+  // Changed POST to GET for EventSource compatibility
   try {
-    const { query } = req.query;
+    const { query } = req.query; // Get query from query params
 
     if (!query) {
-      return res
-        .status(400)
-        .json({ status: false, error: 'Query is required' });
+      // Cannot send 400 status directly with EventSource, handle differently or validate before opening stream
+      console.error('Chat route error: Query is required');
+      res.status(400).end('Query is required'); // End connection with error status
+      return;
     }
     const tenantId = req.user.tenantId;
     const userId = req.user.id;
     if (!tenantId) {
-      return res.status(400).json({
-        status: false,
-        error: 'Tenant is required',
-      });
+      console.error('Chat route error: Tenant is required');
+      res.status(400).end('Tenant is required');
+      return;
     }
+
     // Find the user's chat document, or create it if it doesn't exist
     let chatDoc = await Chat.findOne({ userId });
     if (!chatDoc) {
       chatDoc = new Chat({ tenantId, userId, messages: [] });
     }
+    // Store user message
     chatDoc.messages.push({ sender: 'user', text: query });
-    await chatDoc.save();
+    await chatDoc.save(); // Save user message immediately
 
-    // Recent Messages
-    const recent = chatDoc.messages.slice(-10).map((m) => ({
+    // Recent Messages (Fetch last 10 BEFORE the current user message was added)
+    const recentMessagesForAgent = chatDoc.messages.slice(-11, -1).map((m) => ({
+      // Get 10 previous messages
       sender: m.sender,
-      text: m.sender === 'agent' ? m.data.mongoQuery : m.text,
+      // Simplify context for agent: send agent's query/summary, not full data object
+      text:
+        m.sender === 'agent'
+          ? m.data?.mongoQuery
+            ? `Generated query: ${JSON.stringify(m.data.mongoQuery)}`
+            : m.text
+          : m.text,
     }));
 
     // Set headers for SSE
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders(); // Send headers immediately
 
     // invoke agent
     const agent = buildAgent();
@@ -49,61 +61,76 @@ router.get('/', authMiddleware, async (req, res) => {
     const stream = await agent.stream({
       tenantId,
       userQuery: query,
-      recentMessages: recent,
+      recentMessages: recentMessagesForAgent, // Use specifically fetched recent messages
     });
 
     let finalState = {};
+    let lastSentStepData = null; // Keep track of the last data sent
+
     for await (const chunk of stream) {
       const stepName = Object.keys(chunk)[0];
       const stepOutput = chunk[stepName];
 
       // Send an update for each step
-      res.write(
-        `data: ${JSON.stringify({ step: stepName, data: stepOutput })}\n\n`
-      );
+      const dataToSend = { step: stepName, data: stepOutput };
+      res.write(`data: ${JSON.stringify(dataToSend)}\n\n`);
+      lastSentStepData = dataToSend; // Update last sent data
 
-      finalState = { ...finalState, ...stepOutput };
+      // Update the accumulating final state (in case needed after loop)
+      // Merge stepOutput into finalState, handling potential nested objects if necessary
+      Object.keys(stepOutput).forEach((key) => {
+        finalState[key] = stepOutput[key];
+      });
     }
 
-    // Once the stream is finished, save the final agent response to the database
+    // --- FIX: Only save the final agent response ONCE ---
     const { finalAnswer, tableData, mongoQuery, schemaContext } = finalState;
 
-    // append agent response
-    chatDoc.messages.push({
-      sender: 'agent',
-      text:
-        typeof finalAnswer === 'string'
-          ? finalAnswer
-          : JSON.stringify(finalAnswer),
-      data: {
-        mongoQuery,
-        schemaContext,
-        rawResult: tableData?.rows || null,
-        tableData,
-      },
-    });
-    await chatDoc.save();
+    if (finalAnswer) {
+      // Ensure there is something to save
+      chatDoc.messages.push({
+        sender: 'agent',
+        text:
+          typeof finalAnswer === 'string'
+            ? finalAnswer
+            : JSON.stringify(finalAnswer),
+        // Store relevant structured data from the agent's final state
+        data: {
+          mongoQuery: mongoQuery || null, // Ensure mongoQuery exists
+          // schemaContext: schemaContext, // Avoid saving large schema context if not needed for display
+          rawResult: tableData?.rows || null, // Keep raw results if needed
+          tableData: tableData || null, // Store table config and viz config
+        },
+      });
+      await chatDoc.save(); // Save the final agent message
+    } else {
+      console.warn(
+        'Agent stream finished but no finalAnswer found in finalState.'
+      );
+      // Optionally save an error message or handle this case
+    }
+    // --- END FIX ---
 
-    chatDoc.messages.push({
-      sender: 'agent',
-      text:
-        typeof finalAnswer === 'string'
-          ? finalAnswer
-          : JSON.stringify(finalAnswer),
-      data: {
-        mongoQuery,
-        schemaContext,
-        rawResult: tableData?.rows || null,
-        tableData,
-      },
-    });
-    await chatDoc.save();
+    // Send a final "close" event (optional, but good practice)
+    res.write('event: close\ndata: Stream finished\n\n');
 
-    res.end(); // End the stream
+    res.end(); // End the stream explicitly after saving
   } catch (err) {
     console.error('Chat route error:', err);
-    res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
-    res.end();
+    // Try to send an error event if headers haven't been fully sent
+    if (!res.headersSent) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Internal Server Error' }));
+    } else {
+      // If headers are sent, try sending an error event via SSE
+      res.write(
+        `data: ${JSON.stringify({
+          error: err.message || 'An internal error occurred',
+        })}\n\n`
+      );
+      res.write('event: close\ndata: Stream finished with error\n\n');
+      res.end(); // Ensure stream closure on error
+    }
   }
 });
 
@@ -112,19 +139,26 @@ router.get('/', authMiddleware, async (req, res) => {
 router.get('/messages', authMiddleware, async (req, res) => {
   try {
     const { page = 1, limit = 20 } = req.query;
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
 
     const chat = await Chat.findOne({ userId: req.user.id });
 
-    if (!chat) {
-      // If no chat, return empty messages array
-      return res.json({ status: true, messages: [] });
+    if (!chat || chat.messages.length === 0) {
+      // If no chat or no messages, return empty
+      return res.json({ status: true, messages: [], hasMore: false });
     }
-    // Slice messages in JS (get latest messages for pagination)
-    const start = Math.max(chat.messages.length - page * limit, 0);
-    const end = chat.messages.length - (page - 1) * limit;
-    const paginatedMessages = chat.messages.slice(start, end);
 
-    res.json({ status: true, messages: paginatedMessages });
+    // Calculate pagination slice indices for fetching *older* messages
+    const totalMessages = chat.messages.length;
+    const startIndex = Math.max(totalMessages - pageNum * limitNum, 0);
+    const endIndex = totalMessages - (pageNum - 1) * limitNum;
+
+    // Slice messages in JS (get older messages for pagination)
+    const paginatedMessages = chat.messages.slice(startIndex, endIndex);
+    const hasMore = startIndex > 0; // Check if there are messages before the startIndex
+
+    res.json({ status: true, messages: paginatedMessages, hasMore }); // Return hasMore flag
   } catch (err) {
     console.error('Fetch messages error:', err);
     res.status(500).json({ status: false, error: 'Internal server error' });
