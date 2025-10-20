@@ -17,18 +17,13 @@ const app = express();
 // --- CORS Middleware ---
 app.use(
   cors({
-    origin: 'https://intelli-query.vercel.app',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-  })
-);
-
-app.options(
-  '*',
-  cors({
-    origin: 'https://intelli-query.vercel.app',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    origin: [
+      'https://intelli-query.vercel.app',
+      'http://localhost:4173',
+      'http://localhost:3000',
+      'http://localhost:5173',
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
   })
