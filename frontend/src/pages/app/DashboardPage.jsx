@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Send,
   Loader2,
@@ -444,7 +444,7 @@ const ChatMessageComponent = ({ message, onDelete }) => {
             <Button
               variant="ghost"
               size="icon-sm"
-              className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+              className="absolute top-2 right-2 h-7 w-7 md:opacity-0 md:group-hover:opacity-100 md:transition-opacity"
             >
               <MoreHorizontal className="h-4 w-4" />
               <span className="sr-only">Message options</span>
@@ -475,10 +475,8 @@ const renderCellContent = (value, columnConfig) => {
     return <span className="text-muted-foreground/60 italic">null</span>;
 
   try {
-    switch (
-      columnConfig?.renderAs // Add optional chaining
-    ) {
-      case 'date':
+    switch (columnConfig?.renderAs) {
+      case 'date': {
         const date = new Date(value);
         return isNaN(date.getTime())
           ? String(value)
@@ -487,6 +485,8 @@ const renderCellContent = (value, columnConfig) => {
               month: 'short',
               day: 'numeric',
             });
+      }
+
       case 'currency':
         return typeof value === 'number'
           ? `$${value.toLocaleString(undefined, {
@@ -494,7 +494,9 @@ const renderCellContent = (value, columnConfig) => {
               maximumFractionDigits: 2,
             })}`
           : String(value);
-      case 'link':
+
+      case 'link': {
+        // <-- Added brace
         const url = String(value);
         if (url.startsWith('http://') || url.startsWith('https://')) {
           return (
@@ -509,8 +511,11 @@ const renderCellContent = (value, columnConfig) => {
           );
         }
         return url;
+      }
+
       case 'count':
         return Array.isArray(value) ? `${value.length} items` : '0 items';
+
       case 'list':
         if (Array.isArray(value) && columnConfig.sourceField) {
           return (
@@ -525,8 +530,8 @@ const renderCellContent = (value, columnConfig) => {
         return (
           <span className="text-muted-foreground/60 italic">invalid list</span>
         );
-      case 'default':
-      default:
+
+      default: {
         if (typeof value === 'object') {
           const jsonString = JSON.stringify(value);
           return jsonString.length > 100
@@ -537,6 +542,7 @@ const renderCellContent = (value, columnConfig) => {
           return value ? 'True' : 'False';
         }
         return String(value);
+      }
     }
   } catch (e) {
     console.error('Error rendering cell content:', e);
@@ -779,8 +785,7 @@ export default function DashboardPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3">
           <div className="flex items-end gap-2">
             <div className="flex-1 relative">
-              <Input // Using Input component, assuming it can render as textarea
-                as="textarea"
+              <Textarea
                 rows={1}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}

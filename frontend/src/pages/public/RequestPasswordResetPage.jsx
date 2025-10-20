@@ -13,7 +13,6 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Mail, LoaderCircle } from 'lucide-react';
-import PublicPageLayout from './PublicPageLayout';
 import { toast } from 'sonner';
 
 export default function RequestPasswordResetPage() {
@@ -37,7 +36,7 @@ export default function RequestPasswordResetPage() {
   };
 
   return (
-    <PublicPageLayout>
+    <div className="w-full max-w-sm mx-auto flex items-center justify-center">
       <Card className="w-full bg-background/50 border-white/10 backdrop-blur-lg">
         <CardHeader>
           <CardTitle className="text-2xl">Forgot Password</CardTitle>
@@ -83,6 +82,6 @@ export default function RequestPasswordResetPage() {
           </CardFooter>
         </form>
       </Card>
-    </PublicPageLayout>
+    </div>
   );
 }

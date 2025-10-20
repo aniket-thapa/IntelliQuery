@@ -224,16 +224,6 @@ const InteractiveDemo = () => {
 
 // --- Main App Component ---
 export default function HomePage() {
-  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
-
-  const navLinks = [
-    { name: 'Features', href: '#features' },
-    { name: 'How It Works', href: '#how-it-works' },
-    { name: 'AI Core', href: '#ai-core' },
-    { name: 'Tech Stack', href: '#tech' },
-    { name: 'Quickstart', href: '#quickstart' },
-  ];
-
   const faqs = [
     {
       q: 'How does IntelliQuery understand my database schema?',
@@ -326,84 +316,9 @@ export default function HomePage() {
   ];
 
   return (
-    <div className="min-h-screen w-full bg-background text-white overflow-x-hidden antialiased">
-      <div className="fixed top-0 left-0 w-full h-full -z-10 opacity-50">
-        <div className="absolute top-[-20%] left-[10%] w-[500px] h-[500px] bg-purple-500/30 rounded-full filter blur-3xl animate-blob"></div>
-        <div className="absolute top-[10%] right-[10%] w-[500px] h-[500px] bg-blue-500/30 rounded-full filter blur-3xl animate-blob animation-delay-2000"></div>
-        <div className="absolute bottom-[5%] left-[25%] w-[400px] h-[400px] bg-pink-500/20 rounded-full filter blur-3xl animate-blob animation-delay-4000"></div>
-      </div>
-
-      <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-black/50 backdrop-blur-lg">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
-          <IntelliQueryLogo />
-
-          <nav className="hidden md:flex items-center gap-6">
-            {navLinks.map((link) => (
-              <a
-                key={link.name}
-                href={link.href}
-                className="text-sm font-medium text-gray-300 hover:text-primary transition-colors"
-              >
-                {link.name}
-              </a>
-            ))}
-          </nav>
-          <div className="hidden md:flex items-center gap-4">
-            <Link to="/login">
-              <Button variant="outline">Login</Button>
-            </Link>
-            <Link to="/signup">
-              <Button className="bg-white text-black hover:bg-gray-200">
-                Get Started Free <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
-          <div className="md:hidden">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-            >
-              {isMenuOpen ? (
-                <X className="h-6 w-6" />
-              ) : (
-                <Menu className="h-6 w-6" />
-              )}
-            </Button>
-          </div>
-        </div>
-        {isMenuOpen && (
-          <div className="md:hidden bg-background/80 backdrop-blur-lg">
-            <nav className="flex flex-col items-center space-y-4 p-4">
-              {navLinks.map((link) => (
-                <a
-                  key={link.name}
-                  href={link.href}
-                  className="text-lg font-medium text-gray-300 hover:text-primary transition-colors"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  {link.name}
-                </a>
-              ))}
-              <div className="flex flex-col w-full items-center gap-4 pt-4 border-t border-white/10">
-                <Link to="/login" className="w-full">
-                  <Button variant="ghost" className="w-full">
-                    Login
-                  </Button>
-                </Link>
-                <Link to="/signup" className="w-full">
-                  <Button className="bg-white text-black hover:bg-gray-200 w-full">
-                    Get Started Free
-                  </Button>
-                </Link>
-              </div>
-            </nav>
-          </div>
-        )}
-      </header>
-
+    <div>
       <main className="container mx-auto px-4 md:px-6">
-        <section className="py-24 md:py-32 text-center">
+        <section className="py-20 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -649,26 +564,6 @@ export default function HomePage() {
                 </a>
               </div>
             </div>
-          </div>
-        </div>
-
-        <div className="border-t border-white/10 py-6 relative z-10">
-          <div className="container mx-auto flex flex-col items-center justify-between px-4 text-xs text-gray-500 sm:flex-row md:px-6">
-            <p>
-              &copy; {new Date().getFullYear()} IntelliQuery. All Rights
-              Reserved.
-            </p>
-            <p className="mt-2 sm:mt-0 flex items-center gap-1.5">
-              A project by
-              <a
-                href="https://github.com/aniket-thapa"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium text-gray-400 hover:text-white transition-colors"
-              >
-                Aniket Thapa
-              </a>
-            </p>
           </div>
         </div>
       </footer>

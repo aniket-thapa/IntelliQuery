@@ -22,7 +22,6 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
-import PublicPageLayout from './PublicPageLayout';
 import { toast } from 'sonner';
 
 export default function SignupPage() {
@@ -63,7 +62,7 @@ export default function SignupPage() {
   };
 
   return (
-    <PublicPageLayout>
+    <div className="w-full max-w-sm mx-auto flex items-center justify-center">
       <Card className="w-full bg-background/50 border-white/10 backdrop-blur-lg">
         <CardHeader>
           <CardTitle className="text-2xl">Create an account</CardTitle>
@@ -179,6 +178,6 @@ export default function SignupPage() {
           </CardFooter>
         </form>
       </Card>
-    </PublicPageLayout>
+    </div>
   );
 }

@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import {
   BrowserRouter,
   Routes,
@@ -7,11 +6,11 @@ import {
   useLocation,
 } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import api from '../lib/api';
 import { LoaderCircle } from 'lucide-react';
 
 // Layouts
 import AppLayout from '../layouts/AppLayout';
+import PublicLayout from '../layouts/PublicLayout';
 
 // Public Pages
 import HomePage from '../pages/public/HomePage';
@@ -64,31 +63,52 @@ function AdminRoute({ children }) {
   const isAdmin = user?.role === 'admin' || user?.role === 'developer';
   return isAdmin ? children : <Navigate to="/app/dashboard" replace />;
 }
+function PublicRouteGuard({ children }) {
+  const { token } = useAuth();
+  if (token) {
+    return <Navigate to="/app/dashboard" replace />;
+  }
+  return children;
+}
 
 export default function AppRouter() {
-  const { token } = useAuth();
-
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public Routes - redirect if logged in */}
-        <Route
-          path="/"
-          element={token ? <Navigate to="/app" /> : <HomePage />}
-        />
-        <Route
-          path="/login"
-          element={token ? <Navigate to="/app" /> : <LoginPage />}
-        />
-        <Route
-          path="/signup"
-          element={token ? <Navigate to="/app" /> : <SignupPage />}
-        />
-        <Route path="/forgot-password" element={<RequestPasswordResetPage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path="/accept-invite" element={<AcceptInvitePage />} />
+        <Route element={<PublicLayout />}>
+          <Route
+            path="/"
+            element={
+              <PublicRouteGuard>
+                <HomePage />
+              </PublicRouteGuard>
+            }
+          />
+          <Route
+            path="/login"
+            element={
+              <PublicRouteGuard>
+                <LoginPage />
+              </PublicRouteGuard>
+            }
+          />
+          <Route
+            path="/signup"
+            element={
+              <PublicRouteGuard>
+                <SignupPage />
+              </PublicRouteGuard>
+            }
+          />
 
-        {/* --- Main Application Routes --- */}
+          <Route
+            path="/forgot-password"
+            element={<RequestPasswordResetPage />}
+          />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/accept-invite" element={<AcceptInvitePage />} />
+        </Route>
+
         <Route
           path="/app"
           element={
@@ -97,7 +117,6 @@ export default function AppRouter() {
             </PrivateRoute>
           }
         >
-          {/* Index route for /app */}
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route
@@ -115,7 +134,6 @@ export default function AppRouter() {
           </Route>
         </Route>
 
-        {/* Onboarding route is special - it's private but outside the main AppLayout */}
         <Route
           path="/app/onboarding"
           element={
@@ -125,8 +143,14 @@ export default function AppRouter() {
           }
         />
 
-        {/* Fallback route */}
-        <Route path="*" element={<NotFoundPage />} />
+        <Route
+          path="*"
+          element={
+            <PublicLayout>
+              <NotFoundPage />
+            </PublicLayout>
+          }
+        />
       </Routes>
     </BrowserRouter>
   );

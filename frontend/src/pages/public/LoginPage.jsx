@@ -14,7 +14,6 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Mail, Lock, LoaderCircle, Eye, EyeOff } from 'lucide-react';
-import PublicPageLayout from './PublicPageLayout';
 import { toast } from 'sonner';
 
 export default function LoginPage() {
@@ -51,7 +50,7 @@ export default function LoginPage() {
   };
 
   return (
-    <PublicPageLayout>
+    <div className="w-full max-w-sm mx-auto flex items-center justify-center">
       <Card className="w-full bg-background/50 border-white/10 backdrop-blur-lg">
         <CardHeader>
           <CardTitle className="text-2xl">Login</CardTitle>
@@ -137,6 +136,6 @@ export default function LoginPage() {
           </CardFooter>
         </form>
       </Card>
-    </PublicPageLayout>
+    </div>
   );
 }

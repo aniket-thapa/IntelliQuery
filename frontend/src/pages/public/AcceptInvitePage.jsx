@@ -14,7 +14,6 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Lock, LoaderCircle, Eye, EyeOff } from 'lucide-react';
-import PublicPageLayout from './PublicPageLayout';
 import { toast } from 'sonner';
 
 export default function AcceptInvitePage() {
@@ -78,14 +77,14 @@ export default function AcceptInvitePage() {
 
   if (isTokenValidating) {
     return (
-      <PublicPageLayout>
+      <div>
         <LoaderCircle className="h-8 w-8 animate-spin text-muted-foreground mx-auto" />
-      </PublicPageLayout>
+      </div>
     );
   }
 
   return (
-    <PublicPageLayout>
+    <div className="w-full max-w-sm mx-auto flex items-center justify-center">
       <Card className="w-full bg-background/50 border-white/10 backdrop-blur-lg">
         {isTokenInvalid ? (
           <>
@@ -157,6 +156,6 @@ export default function AcceptInvitePage() {
           </>
         )}
       </Card>
-    </PublicPageLayout>
+    </div>
   );
 }
