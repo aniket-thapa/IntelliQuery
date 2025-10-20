@@ -36,6 +36,7 @@ export default function DatabasePage() {
       }
     } catch (error) {
       toast.error('Failed to fetch database settings.');
+      console.error(error);
     } finally {
       setLoading(false);
     }

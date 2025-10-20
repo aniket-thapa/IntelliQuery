@@ -1,3 +1,4 @@
+// src/pages/app/settings/TeamPage.jsx
 import { useState, useEffect } from 'react';
 import api from '../../../lib/api';
 import { useAuth } from '../../../context/AuthContext';
@@ -95,7 +96,7 @@ export default function TeamPage() {
     return (
       <Dialog open={isInviteDialogOpen} onOpenChange={setInviteDialogOpen}>
         <DialogTrigger asChild>
-          <Button>
+          <Button className="w-full sm:w-auto">
             <UserPlus className="mr-2 h-4 w-4" /> Invite Member
           </Button>
         </DialogTrigger>
@@ -292,7 +293,7 @@ export default function TeamPage() {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <CardTitle>Team Members</CardTitle>
           <CardDescription>
@@ -307,7 +308,7 @@ export default function TeamPage() {
             <LoaderCircle className="animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="border rounded-md">
+          <div className="border rounded-md overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>

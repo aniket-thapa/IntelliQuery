@@ -44,6 +44,7 @@ export default function SchemaPage() {
       }
     } catch (error) {
       toast.error('Failed to fetch database schema.');
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -90,7 +91,8 @@ export default function SchemaPage() {
     <form onSubmit={handleSubmit}>
       <Card className="shadow-lg border border-border/60">
         <CardHeader>
-          <div className="flex justify-between items-center">
+          {/* --- RESPONSIVE CHANGE --- */}
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div>
               <CardTitle>Database Schema</CardTitle>
               <CardDescription>
@@ -102,7 +104,7 @@ export default function SchemaPage() {
               type="button"
               variant="outline"
               onClick={() => setEditMode(!editMode)}
-              className="gap-2"
+              className="gap-2 w-full sm:w-auto"
             >
               {editMode ? (
                 <>
@@ -122,13 +124,16 @@ export default function SchemaPage() {
               value={schemaJson}
               onChange={handleChange}
               rows={25}
-              className="font-mono text-xs max-h-[80vh] rounded-md border border-input bg-muted/40 focus:ring-2 focus:ring-primary/40 transition-all duration-200"
+              // --- RESPONSIVE CHANGE ---
+              className="font-mono text-xs max-h-[60vh] md:max-h-[70vh] rounded-md border border-input bg-muted/40 focus:ring-2 focus:ring-primary/40 transition-all duration-200"
               placeholder='{ "databaseName": "...", "collections": [...] }'
             />
           ) : (
-            <div className="max-h-[80vh] overflow-auto rounded-md bg-muted/50 border border-border/50">
+            // --- RESPONSIVE CHANGE ---
+            <div className="max-h-[60vh] md:max-h-[70vh] overflow-auto rounded-md bg-muted/50 border border-border/50">
               <SyntaxHighlighter
                 language="json"
+                wrapLines={true}
                 style={{
                   ...oneDark,
 
@@ -143,6 +148,9 @@ export default function SchemaPage() {
                   background: 'transparent',
                   fontSize: '0.9rem',
                   lineHeight: '1.4',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-all',
+                  overflowWrap: 'break-word',
                 }}
               >
                 {schemaJson}
@@ -152,8 +160,14 @@ export default function SchemaPage() {
         </CardContent>
 
         {editMode && isChanged && (
-          <CardFooter className="border-t px-6 py-4 flex justify-end">
-            <Button type="submit" disabled={isUpdating}>
+          // --- RESPONSIVE CHANGE ---
+          <CardFooter className="border-t px-6 py-4 flex flex-col sm:flex-row sm:justify-end">
+            <Button
+              type="submit"
+              disabled={isUpdating}
+              // --- RESPONSIVE CHANGE ---
+              className="w-full sm:w-auto"
+            >
               {isUpdating && (
                 <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
               )}

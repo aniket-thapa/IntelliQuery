@@ -8,33 +8,8 @@ import {
   SheetTrigger,
   SheetClose,
 } from '@/components/ui/sheet';
-import { Menu, X, BrainCircuit, ArrowRight } from 'lucide-react';
-import { cn } from '@/lib/utils';
-
-const IntelliQueryLogo = ({ className }) => {
-  return (
-    <Link
-      to="/"
-      className={cn('group flex items-center gap-2 select-none', className)}
-    >
-      <div className="relative flex items-center justify-center">
-        <img
-          src="/intelliquery-logo.svg"
-          alt="IntelliQuery Logo"
-          className="h-7 w-7 text-primary"
-        />
-      </div>
-      <div className="flex flex-col leading-tight">
-        <span className="text-lg sm:text-xl font-bold tracking-tight text-foreground">
-          IntelliQuery
-        </span>
-        <span className="text-[11px] text-muted-foreground group-hover:text-foreground/80 transition-colors">
-          AI Data Analyst
-        </span>
-      </div>
-    </Link>
-  );
-};
+import { Menu, ArrowRight } from 'lucide-react';
+import IntelliQueryLogo from '../components/IntelliQueryLogo';
 
 // Main Header Component
 export default function PublicHeader() {

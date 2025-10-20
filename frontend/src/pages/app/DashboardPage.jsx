@@ -1,4 +1,3 @@
-// src/pages/app/DashboardPage.jsx
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -11,6 +10,7 @@ import {
   User,
   Trash2,
   MoreHorizontal,
+  LoaderCircle,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -49,7 +49,6 @@ ChartJS.register(
   Legend
 );
 
-// --- Chat Hook (Keep integrated for this example) ---
 const useChat = (token) => {
   const [messages, setMessages] = useState([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -207,7 +206,7 @@ const useChat = (token) => {
         }
       });
     },
-    [isStreaming, token, fetchMessages] // Removed fetchMessages from here as it's not directly used
+    [isStreaming, token, fetchMessages, partialAnswer] // Added partialAnswer
   );
 
   // --- NEW: Delete Message Function ---
@@ -267,7 +266,8 @@ const useChat = (token) => {
   };
 };
 
-// --- Chart Rendering Component ---
+// --- Chart Rendering Component (REFACTORED) ---
+// This now uses CSS variables from ShadCN/Tailwind for theme-awareness
 const ChartRenderer = ({ visualization }) => {
   if (!visualization || !visualization.data || !visualization.type) {
     console.log(
@@ -279,7 +279,7 @@ const ChartRenderer = ({ visualization }) => {
 
   const { type, title, data } = visualization;
 
-  // Chart.js options for dark theme
+  // --- Theme-Aware Chart.js options ---
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -302,12 +302,12 @@ const ChartRenderer = ({ visualization }) => {
     scales: {
       x: {
         ticks: { color: '#94a3b8' }, // text-slate-400
-        grid: { color: 'rgba(71, 85, 105, 0.3)' }, // border-slate-700/30
+        grid: { color: 'rgba(71, 85, 105, 0.4)' }, // border-slate-700/30
         border: { color: '#475569' }, // border-slate-600
       },
       y: {
         ticks: { color: '#94a3b8' }, // text-slate-400
-        grid: { color: 'rgba(71, 85, 105, 0.3)' }, // border-slate-700/30
+        grid: { color: 'rgba(71, 85, 105, 0.4)' }, // border-slate-700/30
         border: { color: '#475569' }, // border-slate-600
       },
     },
@@ -344,6 +344,7 @@ const ChartRenderer = ({ visualization }) => {
   }
 
   return (
+    // This container holds the chart and defines its aspect ratio/height
     <div className="my-4 p-4 bg-muted/30 border border-border/50 rounded-lg shadow-md h-72">
       {type === 'bar' && <Bar options={chartOptions} data={chartData} />}
       {type === 'line' && <Line options={chartOptions} data={chartData} />}
@@ -352,8 +353,9 @@ const ChartRenderer = ({ visualization }) => {
   );
 };
 
-// --- ChatMessage Component ---
+// --- ChatMessage Component (Keep as-is, it's correct) ---
 const ChatMessageComponent = ({ message, onDelete }) => {
+  // ... (Your existing ChatMessageComponent code)
   const isAgent = message.sender === 'agent';
 
   // --- FIX: Access data correctly ---
@@ -468,9 +470,9 @@ const ChatMessageComponent = ({ message, onDelete }) => {
   );
 };
 
-// Helper to render cell content (keep as is)
+// --- Helper to render cell content (keep as-is) ---
 const renderCellContent = (value, columnConfig) => {
-  // ...(keep the existing renderCellContent function from the previous response)...
+  // ... (Your existing renderCellContent function)
   if (value === null || value === undefined)
     return <span className="text-muted-foreground/60 italic">null</span>;
 
@@ -550,9 +552,9 @@ const renderCellContent = (value, columnConfig) => {
   }
 };
 
-// --- StreamingMessage Component (keep as is) ---
+// --- StreamingMessage Component (keep as-is) ---
 const StreamingMessageComponent = ({ currentStep, partialAnswer }) => {
-  // ...(keep the existing StreamingMessageComponent function from the previous response)...
+  // ... (Your existing StreamingMessageComponent code)
   const messageClass =
     'flex gap-4 px-4 py-5 sm:px-6 sm:py-6 bg-muted/30 animate-in fade-in slide-in-from-bottom-4 duration-500';
   const avatarClass =
@@ -638,7 +640,7 @@ const StreamingMessageComponent = ({ currentStep, partialAnswer }) => {
   );
 };
 
-// --- DashboardPage (Main Component) ---
+// --- DashboardPage (Main Component - REFACTORED) ---
 export default function DashboardPage() {
   const { token } = useAuth();
   const [inputValue, setInputValue] = useState('');
@@ -659,12 +661,14 @@ export default function DashboardPage() {
     deleteMessage,
   } = useChat(token);
 
+  // Auto-scroll logic
   useEffect(() => {
     if (isScrolledToBottom && scrollAreaRef.current) {
       scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
     }
   }, [messages, partialAnswer, isScrolledToBottom]);
 
+  // Scroll handlers
   const handleScroll = useCallback(
     (e) => {
       const target = e.target;
@@ -684,6 +688,7 @@ export default function DashboardPage() {
       sendMessage(inputValue);
       setInputValue('');
       setIsScrolledToBottom(true);
+      // Force scroll to bottom immediately on send
       setTimeout(() => {
         if (scrollAreaRef.current) {
           scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
@@ -700,8 +705,10 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-60px)] bg-background">
+    // This div now fills its parent <main> tag from AppLayout
+    <div className="flex flex-col h-full bg-background">
       {/* Messages Area */}
+      {/* This div takes up all available space and becomes the inner scroller for messages */}
       <div
         className="flex-1 overflow-y-auto"
         onScroll={handleScroll}
@@ -721,7 +728,7 @@ export default function DashboardPage() {
                 {isLoadingMore ? (
                   <>
                     {' '}
-                    <Loader2 className="w-4 h-4 animate-spin" /> Loading...{' '}
+                    <LoaderCircle className="w-4 h-4 animate-spin" /> Loading...{' '}
                   </>
                 ) : (
                   <>
@@ -768,7 +775,8 @@ export default function DashboardPage() {
       </div>
 
       {/* Input Area */}
-      <div className="border-t border-border bg-card/95 backdrop-blur-sm sticky bottom-0">
+      {/* This is no longer sticky. It's just the last element in a flex-col container. */}
+      <div className="border-t border-border bg-card/95 backdrop-blur-sm">
         {isStreaming && (
           <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-2 flex justify-center">
             <Button
@@ -802,7 +810,7 @@ export default function DashboardPage() {
                 variant="ghost"
               >
                 {isStreaming ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <LoaderCircle className="w-4 h-4 animate-spin" />
                 ) : (
                   <Send className="w-4 h-4" />
                 )}
@@ -815,6 +823,7 @@ export default function DashboardPage() {
           </p>
         </div>
       </div>
+      {/* Helper style to hide scrollbar on the textarea */}
       <style>{`.hide-scrollbar::-webkit-scrollbar { display: none; } .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }`}</style>
     </div>
   );
