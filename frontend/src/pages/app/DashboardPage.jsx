@@ -11,6 +11,7 @@ import {
   Trash2,
   MoreHorizontal,
   LoaderCircle,
+  Download,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -18,6 +19,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Tooltip as TooltipProvider,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import api from '../../lib/api';
@@ -353,6 +359,57 @@ const ChartRenderer = ({ visualization }) => {
   );
 };
 
+// --- Helper function to export data as CSV ---
+const exportToCsv = (filename, tableConfig, rows) => {
+  if (!tableConfig || !rows || rows.length === 0) {
+    toast.error('No data available to export.');
+    return;
+  }
+
+  const escapeCsvCell = (cellValue) => {
+    if (cellValue == null) {
+      // Handles null and undefined
+      return '';
+    }
+    const stringValue = String(cellValue);
+    // If the string contains a comma, double quote, or newline, wrap it in double quotes and escape existing double quotes
+    if (
+      stringValue.includes(',') ||
+      stringValue.includes('"') ||
+      stringValue.includes('\n')
+    ) {
+      return `"${stringValue.replace(/"/g, '""')}"`;
+    }
+    return stringValue;
+  };
+
+  const headers = tableConfig.columns
+    .map((col) => escapeCsvCell(col.header))
+    .join(',');
+  const csvRows = rows.map((row) =>
+    tableConfig.columns.map((col) => escapeCsvCell(row[col.key])).join(',')
+  );
+
+  const csvString = [headers, ...csvRows].join('\n');
+  const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+
+  // Create a link and trigger the download
+  const link = document.createElement('a');
+  if (link.download !== undefined) {
+    // Feature detection
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url); // Clean up
+  } else {
+    toast.error('CSV export is not supported in this browser.');
+  }
+};
+
 // --- ChatMessage Component (Keep as-is, it's correct) ---
 const ChatMessageComponent = ({ message, onDelete }) => {
   // ... (Your existing ChatMessageComponent code)
@@ -365,8 +422,8 @@ const ChatMessageComponent = ({ message, onDelete }) => {
   const rows = tableData?.rows;
   // --- END FIX ---
 
-  const messageClass = `group relative flex gap-4 px-4 py-5 sm:px-6 sm:py-6 animate-in fade-in slide-in-from-bottom-4 duration-500 ${
-    isAgent ? 'bg-muted/30' : ''
+  const messageClass = `group relative flex gap-4 px-4 py-5 sm:py-6 animate-in fade-in slide-in-from-bottom-4 duration-500 ${
+    isAgent ? 'bg-muted/30 rounded-lg' : ''
   }`;
   const avatarClass = `flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
     isAgent
@@ -375,6 +432,15 @@ const ChatMessageComponent = ({ message, onDelete }) => {
   }`;
   const proseClass =
     'prose prose-sm max-w-none dark:prose-invert prose-p:leading-relaxed prose-pre:bg-muted/50 prose-pre:border prose-pre:border-border/50 p-2 rounded';
+
+  // --- Handler for the Export Button ---
+  const handleExportClick = () => {
+    const filename = `intelliquery_export_${
+      new Date().toISOString().split('T')[0]
+    }.csv`;
+    exportToCsv(filename, tableConfig, rows);
+    toast.success('CSV Exported!');
+  };
 
   return (
     <div className={messageClass}>
@@ -394,49 +460,69 @@ const ChatMessageComponent = ({ message, onDelete }) => {
           </span>
         </div>
         <div className={proseClass}>
-          {/* Render Visualization if present (using corrected path) */}
-          {isAgent && visualization && (
-            <ChartRenderer visualization={visualization} />
-          )}
-
-          {/* Render table data if present (using corrected paths) */}
-          {isAgent && tableConfig && rows && rows.length > 0 && (
-            <div className="my-4 overflow-x-auto border border-border/50 rounded-md">
-              <table className="min-w-full divide-y divide-border/50">
-                <thead className="bg-muted/50">
-                  <tr>
-                    {tableConfig.columns.map((col) => (
-                      <th
-                        key={col.key}
-                        className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider"
-                      >
-                        {col.header}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/50">
-                  {rows.map((row, rowIndex) => (
-                    <tr key={rowIndex} className="hover:bg-muted/20">
-                      {tableConfig.columns.map((col) => (
-                        <td
-                          key={col.key}
-                          className="px-4 py-2 whitespace-nowrap text-sm"
-                        >
-                          {renderCellContent(row[col.key], col)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
           {/* Render markdown text */}
           {message.text && (
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {message.text}
             </ReactMarkdown>
+          )}
+
+          {/* Render table data if present (using corrected paths) */}
+          {isAgent && tableConfig && rows && rows.length > 0 && (
+            <div className="md:my-12 my-8 relative group/table">
+              {/* Added relative positioning and group */}
+              <div className="overflow-x-auto border border-border/50 rounded-md">
+                <table className="min-w-full divide-y divide-border/50">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      {tableConfig.columns.map((col) => (
+                        <th
+                          key={col.key}
+                          className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider"
+                        >
+                          {col.header}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {rows.map((row, rowIndex) => (
+                      <tr key={rowIndex} className="hover:bg-muted/20">
+                        {tableConfig.columns.map((col) => (
+                          <td
+                            key={col.key}
+                            className="px-4 py-2 whitespace-nowrap text-sm"
+                          >
+                            {renderCellContent(row[col.key], col)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Export Button - positioned top-right of the table container */}
+              <TooltipProvider>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    className="absolute -top-3 right-0 h-7 w-7 md:opacity-0 md:group-hover/table:opacity-100 transition-opacity duration-200 bg-background hover:bg-muted"
+                    onClick={handleExportClick}
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" align="center">
+                  <p>Export table as CSV</p>
+                </TooltipContent>
+              </TooltipProvider>
+            </div>
+          )}
+
+          {/* Render Visualization if present (using corrected path) */}
+          {isAgent && visualization && (
+            <ChartRenderer visualization={visualization} />
           )}
         </div>
       </div>
@@ -536,8 +622,9 @@ const renderCellContent = (value, columnConfig) => {
       default: {
         if (typeof value === 'object') {
           const jsonString = JSON.stringify(value);
-          return jsonString.length > 100
-            ? jsonString.substring(0, 97) + '...'
+          // Simple truncation for display, full data will be in CSV
+          return jsonString.length > 50
+            ? jsonString.substring(0, 47) + '...'
             : jsonString;
         }
         if (typeof value === 'boolean') {
@@ -714,7 +801,7 @@ export default function DashboardPage() {
         onScroll={handleScroll}
         ref={scrollAreaRef}
       >
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4">
           {/* Load More Indicator */}
           {hasMore && (
             <div className="flex justify-center py-4">
