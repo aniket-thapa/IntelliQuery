@@ -247,17 +247,6 @@ const useChat = (token) => {
     [fetchMessages]
   ); // Added fetchMessages dependency
 
-  const cancelStreaming = useCallback(() => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      console.log('SSE stream aborted by user.');
-    }
-    setIsStreaming(false);
-    setCurrentStep('');
-    setPartialAnswer('');
-    eventSourceRef.current = null;
-  }, []);
-
   return {
     messages,
     isStreaming,
@@ -266,7 +255,6 @@ const useChat = (token) => {
     isLoadingMore,
     hasMore,
     sendMessage,
-    cancelStreaming,
     loadMoreMessages,
     deleteMessage,
   };
@@ -744,7 +732,6 @@ export default function DashboardPage() {
     hasMore,
     sendMessage,
     loadMoreMessages,
-    cancelStreaming,
     deleteMessage,
   } = useChat(token);
 
@@ -864,19 +851,6 @@ export default function DashboardPage() {
       {/* Input Area */}
       {/* This is no longer sticky. It's just the last element in a flex-col container. */}
       <div className="border-t border-border bg-card/95 backdrop-blur-sm">
-        {isStreaming && (
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-2 flex justify-center">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={cancelStreaming}
-              className="gap-2"
-            >
-              <div className="w-2 h-2 rounded-full bg-destructive animate-pulse"></div>
-              Cancel Response
-            </Button>
-          </div>
-        )}
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3">
           <div className="flex items-end gap-2">
             <div className="flex-1 relative">
