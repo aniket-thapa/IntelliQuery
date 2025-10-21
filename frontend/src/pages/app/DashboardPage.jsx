@@ -410,8 +410,10 @@ const ChatMessageComponent = ({ message, onDelete }) => {
   const rows = tableData?.rows;
   // --- END FIX ---
 
-  const messageClass = `group relative flex gap-4 px-4 py-5 sm:py-6 animate-in fade-in slide-in-from-bottom-4 duration-500 ${
-    isAgent ? 'bg-muted/30 rounded-lg' : ''
+  const messageClass = `group relative flex gap-2 sm:gap-4 px-4 py-5 sm:py-6 animate-in fade-in slide-in-from-bottom-4 duration-500 ${
+    isAgent
+      ? 'bg-muted/30 rounded-lg'
+      : 'mt-2 sm:mt-4 pt-4 sm:pt-8 border-t border-border'
   }`;
   const avatarClass = `flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
     isAgent
@@ -419,7 +421,7 @@ const ChatMessageComponent = ({ message, onDelete }) => {
       : 'bg-secondary text-secondary-foreground'
   }`;
   const proseClass =
-    'prose prose-sm max-w-none dark:prose-invert prose-p:leading-relaxed prose-pre:bg-muted/50 prose-pre:border prose-pre:border-border/50 p-2 rounded';
+    'prose prose-sm max-w-none dark:prose-invert prose-p:leading-relaxed prose-pre:bg-muted/50 prose-pre:border prose-pre:border-border/50 py-2 rounded';
 
   // --- Handler for the Export Button ---
   const handleExportClick = () => {
@@ -678,6 +680,7 @@ const StreamingMessageComponent = ({ currentStep, partialAnswer }) => {
                 <span className="capitalize">
                   {currentStep
                     .replace(/_/g, ' ')
+                    .replace('queryClassifier', 'Analyzing request')
                     .replace('schemaSearch', 'Analyzing Schema')
                     .replace('queryGen', 'Generating Query')
                     .replace('executor', 'Executing Query')
