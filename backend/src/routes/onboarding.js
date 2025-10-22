@@ -82,9 +82,7 @@ router.post('/schema', authMiddleware, async (req, res) => {
     await dbSchema.save();
 
     // Trigger embeddings
-    processSchemaEmbeddings(tenantId, dbSchema)
-      .then((res) => console.log('Embeddings processed:', res))
-      .catch((err) => console.error('Embedding error:', err.message));
+    await processSchemaEmbeddings(tenantId, dbSchema);
 
     res.json({
       status: true,
