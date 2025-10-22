@@ -1,4 +1,4 @@
-# **IntelliQuery Backend – Documentation**
+# **IntelliQuery Backend – Documentation (For Developers)**
 
 ## 1. Architecture Overview
 
