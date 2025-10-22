@@ -4,7 +4,9 @@
 
 **It's built for teams and businesses who want to democratize data access without requiring everyone to learn MQL.**
 
-[![IntelliQuery](https://i.ibb.co/SXwLHPS7/intelli-query-vercel-app.png)](https://intelli-query.vercel.app/)
+<p style="text-align:center;">
+    [![IntelliQuery](https://i.ibb.co/SXwLHPS7/intelli-query-vercel-app.png)](https://intelli-query.vercel.app/)
+</p>
 
 ---
 
