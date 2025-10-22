@@ -9,6 +9,7 @@
     <img src="https://i.ibb.co/SXwLHPS7/intelli-query-vercel-app.png" alt="IntelliQuery">
   </a>
 </p>
+
 ---
 
 ## ✨ Key Features
