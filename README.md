@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="https://intelli-query.vercel.app/">
-    <img src="https://i.ibb.co/SXwLHPS7/intelli-query-vercel-app.png" alt="IntelliQuery">
+    <img src="https://ik.imagekit.io/aniketthapadev/intelli-query.png" alt="IntelliQuery">
   </a>
 </p>
 
