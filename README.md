@@ -139,5 +139,5 @@ This project is licensed under the MIT License. See the LICENSE file for details
 - **Aniket Thapa**
   - GitHub: [@aniket-thapa](https://github.com/aniket-thapa)
   - LinkedIn: [@aniket-thapa](https://linkedin.com/in/aniket-thapa)
-  - Twitter: [@aniket_thapa](https://x.com/aniketthapa_dev)
+  - Twitter: [@aniketthapa_dev](https://x.com/aniketthapa_dev)
   - Email: [aniketthapa04@gmail.com](mailto:aniketthapa04@gmail.com)
