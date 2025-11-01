@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -399,7 +399,7 @@ const exportToCsv = (filename, tableConfig, rows) => {
 };
 
 // --- ChatMessage Component (Keep as-is, it's correct) ---
-const ChatMessageComponent = ({ message, onDelete }) => {
+const ChatMessageComponent = memo(({ message, onDelete }) => {
   // ... (Your existing ChatMessageComponent code)
   const isAgent = message.sender === 'agent';
 
@@ -461,8 +461,8 @@ const ChatMessageComponent = ({ message, onDelete }) => {
           {isAgent && tableConfig && rows && rows.length > 0 && (
             <div className="md:my-12 my-8 relative group/table">
               {/* Added relative positioning and group */}
-              <div className="overflow-x-auto border border-border/50 rounded-md">
-                <table className="min-w-full divide-y divide-border/50">
+              <div className="max-h-[75vh] overflow-x-auto border border-border/50 rounded-md">
+                <table className="max-w-full divide-y divide-border/50">
                   <thead className="bg-muted/50">
                     <tr>
                       {tableConfig.columns.map((col) => (
@@ -479,10 +479,7 @@ const ChatMessageComponent = ({ message, onDelete }) => {
                     {rows.map((row, rowIndex) => (
                       <tr key={rowIndex} className="hover:bg-muted/20">
                         {tableConfig.columns.map((col) => (
-                          <td
-                            key={col.key}
-                            className="px-4 py-2 whitespace-nowrap text-sm"
-                          >
+                          <td key={col.key} className="px-4 py-2 text-sm">
                             {renderCellContent(row[col.key], col)}
                           </td>
                         ))}
@@ -544,7 +541,7 @@ const ChatMessageComponent = ({ message, onDelete }) => {
       )}
     </div>
   );
-};
+});
 
 // --- Helper to render cell content (keep as-is) ---
 const renderCellContent = (value, columnConfig) => {
@@ -630,7 +627,7 @@ const renderCellContent = (value, columnConfig) => {
 };
 
 // --- StreamingMessage Component (keep as-is) ---
-const StreamingMessageComponent = ({ currentStep, partialAnswer }) => {
+const StreamingMessageComponent = memo(({ currentStep, partialAnswer }) => {
   // ... (Your existing StreamingMessageComponent code)
   const messageClass =
     'flex gap-4 px-4 py-5 sm:px-6 sm:py-6 bg-muted/30 animate-in fade-in slide-in-from-bottom-4 duration-500';
@@ -716,7 +713,7 @@ const StreamingMessageComponent = ({ currentStep, partialAnswer }) => {
       </div>
     </>
   );
-};
+});
 
 // --- DashboardPage (Main Component - REFACTORED) ---
 export default function DashboardPage() {
