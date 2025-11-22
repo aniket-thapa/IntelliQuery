@@ -20,7 +20,7 @@ export default function PublicLayout({ children }) {
               &copy; {new Date().getFullYear()} IntelliQuery. All Rights
               Reserved.
             </p>
-            {/* <p className="mt-2 sm:mt-0 flex items-center gap-1.5">
+            <p className="mt-2 sm:mt-0 flex items-center gap-1.5">
               A project by
               <a
                 href="https://github.com/aniket-thapa"
@@ -30,7 +30,7 @@ export default function PublicLayout({ children }) {
               >
                 Aniket Thapa
               </a>
-            </p> */}
+            </p>
           </div>
         </div>
       </footer>
