@@ -17,7 +17,11 @@ const app = express();
 // --- CORS Middleware ---
 app.use(
   cors({
-    origin: 'https://intelli-query.vercel.app',
+    origin: [
+      'https://intelli-query.vercel.app',
+      'http://localhost:4173',
+      'https://intelliquery.aniketthapa.me',
+    ],
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
