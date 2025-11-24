@@ -287,3 +287,40 @@ flowchart TD
 ```
 
 ---
+
+## 6. USE CASE DIAGRAM
+
+```mermaid
+usecaseDiagram
+    actor "User (Member)" as Member
+    actor "Admin" as Admin
+
+    package "IntelliQuery System" {
+        usecase "Sign Up / Login" as UC1
+        usecase "Reset Password" as UC2
+        usecase "Ask Natural Language Query" as UC3
+        usecase "View Insights (Charts/Tables)" as UC4
+        usecase "Export Data (CSV)" as UC5
+        
+        usecase "Onboard System\n(Connect DB & Schema)" as UC6
+        usecase "Invite Team Members" as UC7
+        usecase "Manage Member Roles" as UC8
+        usecase "Remove Members" as UC9
+        usecase "Update Database Config" as UC10
+    }
+
+    %% Relationships
+    Member --> UC1
+    Member --> UC2
+    Member --> UC3
+    Member --> UC4
+    Member --> UC5
+
+    %% Admin inherits all Member capabilities plus specific administrative tasks
+    Admin --|> Member
+    Admin --> UC6
+    Admin --> UC7
+    Admin --> UC8
+    Admin --> UC9
+    Admin --> UC10
+```
