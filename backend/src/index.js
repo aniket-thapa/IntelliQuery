@@ -11,7 +11,7 @@ import tenantRoutes from './routes/tenant.js';
 import searchRoutes from './routes/search.js';
 import chatRoutes from './routes/chat.js';
 
-dotenv.config();
+dotenv.config({ quiet: true });
 const app = express();
 
 // --- CORS Middleware ---
@@ -19,8 +19,8 @@ app.use(
   cors({
     origin: [
       'https://intelli-query.vercel.app',
-      'http://localhost:4173',
       'https://intelliquery.aniketthapa.me',
+      'http://localhost:5173',
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],

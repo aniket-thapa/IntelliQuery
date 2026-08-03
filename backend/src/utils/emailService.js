@@ -104,9 +104,8 @@ export async function sendEmail(to, type, link) {
     });
 
     const mailOptions = {
-      from: `"IntelliQuery" <${
-        process.env.MAIL_FROM || process.env.SMTP_USER
-      }>`,
+      from: `"IntelliQuery" <${process.env.MAIL_FROM || process.env.SMTP_USER
+        }>`,
       to,
       subject,
       html,
