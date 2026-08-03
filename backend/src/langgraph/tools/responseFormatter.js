@@ -2,18 +2,20 @@
 import extractAndParseJson from '../../utils/extractAndParseJson.js';
 
 export default async function formatResponse({ context, model }) {
-  const { userQuery, rows } = context;
+  const { userQuery, rows, error } = context;
+
+  if (error) {
+    return {
+      finalAnswer: `### Error\n${error}`,
+      tableData: null,
+    };
+  }
 
   if (!rows || rows.length === 0) {
     return {
       finalAnswer:
         "### No Results\nI couldn't find any records matching your query.",
-      tableData: {
-        markdownAnalysis: 'No data found.',
-        tableConfig: null,
-        visualization: null,
-        rows: [],
-      },
+      tableData: null,
     };
   }
 
@@ -145,7 +147,7 @@ Now, generate the single, complete, and valid JSON object based on these perfect
 
       if (
         rows.length > 0 &&
-        rows[0][labelField] &&
+        rows[0][labelField] !== undefined &&
         rows[0][dataField] !== undefined
       ) {
         finalVisualization = {

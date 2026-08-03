@@ -1,5 +1,5 @@
 // src/langgraph/agent.js
-import { StateGraph, END } from '@langchain/langgraph';
+import { StateGraph, END, START } from '@langchain/langgraph';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { searchSchemaVectors } from '../utils/vectorSearchService.js';
 import { getTenantDb } from '../utils/mongoClient.js';
@@ -24,7 +24,7 @@ const initialState = {
 
 export function buildAgent() {
   const model = new ChatGoogleGenerativeAI({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
     apiKey: process.env.GOOGLE_API_KEY,
     temperature: 0.0,
   });
@@ -123,7 +123,7 @@ Provide only the valid JSON object and nothing else.
 
       try {
         const parsed = extractAndParseJson(response.content);
-        if (parsed.classification === 'general_query' && parsed.response) {
+        if (parsed && parsed.classification === 'general_query' && parsed.response) {
           directResponse = parsed.response;
         }
       } catch (e) {
@@ -173,8 +173,7 @@ Provide only the valid JSON object and nothing else.
         return {
           result: {
             status: false,
-            error:
-              'State is missing mongoQuery.pipeline or mongoQuery.collection',
+            error: state.mongoQuery?.error || 'State is missing mongoQuery.pipeline or mongoQuery.collection',
           },
         };
       }
@@ -243,10 +242,12 @@ Provide only the valid JSON object and nothing else.
     // 5) Response formatter - user friendly + tableData
     .addNode('responseFormatter', async (state) => {
       const rows = state.result?.rows ?? [];
+      const error = state.result?.error;
       const context = {
         userQuery: state.userQuery,
         schemaContext: state.schemaContext,
         rows,
+        error,
       };
       const { finalAnswer, tableData } = await formatResponse({
         context,
@@ -258,7 +259,7 @@ Provide only the valid JSON object and nothing else.
   // --- Graph Edges (Routing) ---
 
   // 1. Entry point now goes to the new classifier
-  graph.addEdge('__start__', 'queryClassifier');
+  graph.addEdge(START, 'queryClassifier');
 
   // 2. Add conditional routing from the classifier
   graph.addConditionalEdges(
