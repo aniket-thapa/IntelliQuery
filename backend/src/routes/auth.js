@@ -159,8 +159,6 @@ router.post('/reset-password', async (req, res) => {
 router.post('/accept-invite', async (req, res) => {
   const { token, password } = req.body;
 
-  console.log();
-
   if (!token) {
     return res.status(400).json({ status: false, error: 'Token is required' });
   }
@@ -168,8 +166,6 @@ router.post('/accept-invite', async (req, res) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const { email, name, tenantId, role, jti } = decoded;
-
-    console.log();
 
     const invitation = await Invitation.findOne({ tokenIdentifier: jti });
 

@@ -89,7 +89,9 @@ router.get('/', authMiddleware, async (req, res) => {
       tenantId: req.user.tenantId,
     });
 
-    integration.connectionUri = decrypt(integration.connectionUri);
+    if (integration && integration.connectionUri) {
+      integration.connectionUri = decrypt(integration.connectionUri);
+    }
 
     res.json({ status: true, integration });
   } catch (err) {

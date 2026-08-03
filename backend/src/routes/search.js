@@ -22,7 +22,7 @@ router.post('/schema', authMiddleware, async (req, res) => {
       return res.status(500).json({ status: false, result });
     }
 
-    res.json({ status: false, result });
+    res.json({ status: true, result });
   } catch (err) {
     console.error('Search route error:', err.message);
     res.status(500).json({ status: false, error: 'Internal server error' });
