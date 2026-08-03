@@ -1,6 +1,6 @@
 // src/index.js
+import 'dotenv/config';
 import express from 'express';
-import dotenv from 'dotenv';
 import cors from 'cors';
 import { connectDB } from './config/db.js';
 import authRoutes from './routes/auth.js';
@@ -10,8 +10,6 @@ import userRoutes from './routes/user.js';
 import tenantRoutes from './routes/tenant.js';
 import searchRoutes from './routes/search.js';
 import chatRoutes from './routes/chat.js';
-
-dotenv.config({ quiet: true });
 const app = express();
 
 // --- CORS Middleware ---
