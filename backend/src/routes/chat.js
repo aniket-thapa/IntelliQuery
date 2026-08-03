@@ -58,10 +58,18 @@ router.get('/', authMiddleware, async (req, res) => {
     // invoke agent
     const agent = buildAgent();
 
+    const abortController = new AbortController();
+    req.on('close', () => {
+      console.log('Client closed connection. Aborting agent...');
+      abortController.abort();
+    });
+
     const stream = await agent.stream({
       tenantId,
       userQuery: query,
       recentMessages: recentMessagesForAgent, // Use specifically fetched recent messages
+    }, {
+      signal: abortController.signal
     });
 
     let finalState = {};
@@ -116,6 +124,10 @@ router.get('/', authMiddleware, async (req, res) => {
 
     res.end(); // End the stream explicitly after saving
   } catch (err) {
+    if (err.name === 'AbortError' || err.message === 'Abort' || err.message === 'Aborted' || (err.message && err.message.toLowerCase().includes('abort'))) {
+      console.log('Agent execution aborted by client.');
+      return;
+    }
     console.error('Chat route error:', err);
     // Try to send an error event if headers haven't been fully sent
     if (!res.headersSent) {

@@ -12,6 +12,7 @@ import {
   MoreHorizontal,
   LoaderCircle,
   Download,
+  Square,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -247,6 +248,17 @@ const useChat = (token) => {
     [fetchMessages]
   ); // Added fetchMessages dependency
 
+  const stopGenerating = useCallback(() => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+    setIsStreaming(false);
+    setCurrentStep('');
+    setPartialAnswer('');
+    fetchMessages(1);
+  }, [fetchMessages]);
+
   return {
     messages,
     isStreaming,
@@ -257,6 +269,7 @@ const useChat = (token) => {
     sendMessage,
     loadMoreMessages,
     deleteMessage,
+    stopGenerating,
   };
 };
 
@@ -771,6 +784,7 @@ export default function DashboardPage() {
     sendMessage,
     loadMoreMessages,
     deleteMessage,
+    stopGenerating,
   } = useChat(token);
 
   // Auto-scroll logic
@@ -890,6 +904,18 @@ export default function DashboardPage() {
       {/* This is no longer sticky. It's just the last element in a flex-col container. */}
       <div className="border-t border-border bg-card/95 backdrop-blur-sm">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3">
+          {isStreaming && (
+            <div className="flex justify-center mb-3">
+              <Button
+                onClick={stopGenerating}
+                variant="outline"
+                size="sm"
+                className="gap-2 rounded-full px-4 text-xs shadow-sm bg-background/80 hover:bg-muted"
+              >
+                <Square className="w-3 h-3 fill-current" /> Stop generating
+              </Button>
+            </div>
+          )}
           <div className="flex items-end gap-2">
             <div className="flex-1 relative">
               <Textarea
