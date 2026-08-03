@@ -43,20 +43,12 @@ export async function processSchemaEmbeddings(tenantId, dbSchema) {
       doc.vector = await createEmbedding(doc.text);
     }
 
-    // Perform a single bulk write to the database
-    const bulkOps = docs.map((doc) => ({
-      updateOne: {
-        filter: {
-          tenantId: doc.tenantId,
-          collectionName: doc.collectionName,
-          fieldName: doc.fieldName,
-        },
-        update: { $set: doc },
-        upsert: true,
-      },
-    }));
+    // Delete old vectors before inserting new ones
+    await SchemaVector.deleteMany({ tenantId });
 
-    await SchemaVector.bulkWrite(bulkOps);
+    if (docs.length > 0) {
+      await SchemaVector.insertMany(docs);
+    }
 
     return { count: docs.length };
   } catch (err) {

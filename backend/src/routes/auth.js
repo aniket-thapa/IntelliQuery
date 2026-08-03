@@ -187,36 +187,40 @@ router.post('/accept-invite', async (req, res) => {
 
     const existingUser = await User.findOne({ email });
 
+    // If the user already belongs to a tenant, they cannot join a new one.
+    if (existingUser && existingUser.tenantId) {
+      return res.status(409).json({
+        status: false,
+        error:
+          'This user is already a member of a tenant and cannot join a new one.',
+      });
+    }
+
     // --- Core Logic Change (Using a Transaction for Atomicity) ---
     const session = await mongoose.startSession();
     session.startTransaction();
     try {
-      if (existingUser) {
-        return res.status(409).json({
-          status: false,
-          error:
-            'This user is already a member of a tenant and cannot join a new one.',
-        });
-      } else {
+      let userToJoin = existingUser;
+      
+      if (!userToJoin) {
         if (!password) {
-          return res.status(400).json({
-            status: false,
-            error: 'Password is required.',
-          });
+          throw new Error('Password is required.');
         }
         const passwordHash = await bcrypt.hash(password, 10);
-        const newUser = new User({ name, email, passwordHash, role, tenantId });
-
-        console.log('newUser', newUser);
-
-        await newUser.save({ session });
-
-        const tenant = await Tenant.findById(tenantId).session(session);
-        if (!tenant) throw new Error('Tenant not found.');
-
-        tenant.members.push(newUser._id);
-        await tenant.save({ session });
+        userToJoin = new User({ name, email, passwordHash, role, tenantId });
+        await userToJoin.save({ session });
+      } else {
+        // If the user exists but doesn't have a tenantId (e.g. they were removed from their previous tenant)
+        userToJoin.tenantId = tenantId;
+        userToJoin.role = role;
+        await userToJoin.save({ session });
       }
+
+      const tenant = await Tenant.findById(tenantId).session(session);
+      if (!tenant) throw new Error('Tenant not found.');
+
+      tenant.members.push(userToJoin._id);
+      await tenant.save({ session });
 
       invitation.status = 'accepted';
       await invitation.save({ session });

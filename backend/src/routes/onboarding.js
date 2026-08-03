@@ -3,6 +3,7 @@ import express from 'express';
 import DatabaseSchema from '../models/DatabaseSchema.js';
 import Integration from '../models/Integration.js';
 import Tenant from '../models/Tenant.js';
+import SchemaVector from '../models/SchemaVector.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 import { processSchemaEmbeddings } from '../utils/embeddingService.js';
@@ -163,6 +164,8 @@ router.delete('/schema', authMiddleware, async (req, res) => {
     if (!schema) {
       return res.status(404).json({ status: false, error: 'Schema not found' });
     }
+
+    await SchemaVector.deleteMany({ tenantId });
 
     res.json({ status: true, message: 'Schema deleted' });
   } catch (err) {

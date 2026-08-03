@@ -1,12 +1,14 @@
 // routes/search.js
 import express from 'express';
 import { searchSchemaVectors } from '../utils/vectorSearchService.js';
+import { authMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
 
-router.post('/schema', async (req, res) => {
+router.post('/schema', authMiddleware, async (req, res) => {
   try {
-    const { tenantId, query, k } = req.body;
+    const { query, k } = req.body;
+    const tenantId = req.user.tenantId;
 
     if (!tenantId || !query) {
       return res

@@ -1,5 +1,6 @@
 // backend/src/routes/user.js
 import express from 'express';
+import mongoose from 'mongoose';
 import User from '../models/User.js';
 import Tenant from '../models/Tenant.js';
 import { authMiddleware } from '../middleware/auth.js';

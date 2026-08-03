@@ -37,11 +37,11 @@ router.post('/', authMiddleware, async (req, res) => {
     }
 
     // --- Verify MongoDB Connection ---
-    const client = new MongoClient(connectionUri, {
-      serverSelectionTimeoutMS: 5000, // 5 seconds timeout
-    });
-
+    let client;
     try {
+      client = new MongoClient(connectionUri, {
+        serverSelectionTimeoutMS: 5000, // 5 seconds timeout
+      });
       await client.connect();
       await client.db(dbName).command({ ping: 1 }); // Simple ping to check connection
     } catch (err) {
@@ -49,7 +49,9 @@ router.post('/', authMiddleware, async (req, res) => {
         .status(400)
         .json({ status: false, error: 'Invalid MongoDB connection URL.' });
     } finally {
-      await client.close();
+      if (client) {
+        await client.close();
+      }
     }
     // --- Save Encrypted URI ---
     const encryptedUri = encrypt(connectionUri);
