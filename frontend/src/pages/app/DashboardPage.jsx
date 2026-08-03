@@ -347,6 +347,43 @@ const ChartRenderer = ({ visualization }) => {
   );
 };
 
+// --- Helper functions for data extraction ---
+const getNestedValue = (obj, path) => {
+  if (obj === null || obj === undefined) return undefined;
+  if (Object.prototype.hasOwnProperty.call(obj, path)) return obj[path];
+  
+  const parts = path.split('.');
+  if (parts.length === 1) return undefined;
+  
+  return parts.reduce((acc, part) => {
+    if (acc === null || acc === undefined) return undefined;
+    return acc[part];
+  }, obj);
+};
+
+const resolveRows = (originalRows, columns) => {
+  if (!originalRows || originalRows.length === 0 || !columns) return [];
+  
+  const hasAnyKey = columns.some(col => getNestedValue(originalRows[0], col.key) !== undefined);
+  if (hasAnyKey) return originalRows;
+
+  if (originalRows.length === 1) {
+    const row = originalRows[0];
+    for (const key in row) {
+      if (Array.isArray(row[key]) && row[key].length > 0) {
+        const firstItem = row[key][0];
+        if (typeof firstItem === 'object' && firstItem !== null) {
+          const arrayHasAnyKey = columns.some(col => getNestedValue(firstItem, col.key) !== undefined);
+          if (arrayHasAnyKey) {
+            return row[key];
+          }
+        }
+      }
+    }
+  }
+  return originalRows;
+};
+
 // --- Helper function to export data as CSV ---
 const exportToCsv = (filename, tableConfig, rows) => {
   if (!tableConfig || !rows || rows.length === 0) {
@@ -375,7 +412,7 @@ const exportToCsv = (filename, tableConfig, rows) => {
     .map((col) => escapeCsvCell(col.header))
     .join(',');
   const csvRows = rows.map((row) =>
-    tableConfig.columns.map((col) => escapeCsvCell(row[col.key])).join(',')
+    tableConfig.columns.map((col) => escapeCsvCell(getNestedValue(row, col.key))).join(',')
   );
 
   const csvString = [headers, ...csvRows].join('\n');
@@ -408,6 +445,7 @@ const ChatMessageComponent = memo(({ message, onDelete }) => {
   const visualization = tableData?.visualization;
   const tableConfig = tableData?.tableConfig;
   const rows = tableData?.rows;
+  const displayRows = rows && tableConfig ? resolveRows(rows, tableConfig.columns) : rows;
   // --- END FIX ---
 
   const messageClass = `group relative flex gap-2 sm:gap-4 px-4 py-5 sm:py-6 animate-in fade-in slide-in-from-bottom-4 duration-500 ${
@@ -428,7 +466,7 @@ const ChatMessageComponent = memo(({ message, onDelete }) => {
     const filename = `intelliquery_export_${
       new Date().toISOString().split('T')[0]
     }.csv`;
-    exportToCsv(filename, tableConfig, rows);
+    exportToCsv(filename, tableConfig, displayRows);
     toast.success('CSV Exported!');
   };
 
@@ -476,11 +514,11 @@ const ChatMessageComponent = memo(({ message, onDelete }) => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/50">
-                    {rows.map((row, rowIndex) => (
+                    {displayRows.map((row, rowIndex) => (
                       <tr key={rowIndex} className="hover:bg-muted/20">
                         {tableConfig.columns.map((col) => (
                           <td key={col.key} className="px-4 py-2 text-sm">
-                            {renderCellContent(row[col.key], col)}
+                            {renderCellContent(getNestedValue(row, col.key), col)}
                           </td>
                         ))}
                       </tr>
