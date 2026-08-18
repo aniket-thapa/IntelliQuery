@@ -8,8 +8,10 @@ const clientCache = new Map();
 export async function getTenantDb(tenantId) {
   if (!tenantId) throw new Error('tenantId required');
 
-  if (clientCache.has(tenantId)) {
-    return clientCache.get(tenantId).db;
+  const tenantIdStr = tenantId.toString();
+
+  if (clientCache.has(tenantIdStr)) {
+    return clientCache.get(tenantIdStr).db;
   }
 
   const integration = await Integration.findOne({ tenantId, status: 'active' });
@@ -25,7 +27,7 @@ export async function getTenantDb(tenantId) {
     await client.connect();
     const db = client.db(integration.dbName);
 
-    clientCache.set(tenantId, { client, db });
+    clientCache.set(tenantIdStr, { client, db });
 
     return db;
   } catch (error) {
@@ -37,9 +39,10 @@ export async function getTenantDb(tenantId) {
 }
 
 export async function closeTenantDb(tenantId) {
-  const entry = clientCache.get(tenantId);
+  const tenantIdStr = tenantId.toString();
+  const entry = clientCache.get(tenantIdStr);
   if (entry) {
     await entry.client.close();
-    clientCache.delete(tenantId);
+    clientCache.delete(tenantIdStr);
   }
 }

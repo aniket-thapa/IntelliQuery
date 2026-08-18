@@ -27,14 +27,15 @@ router.get('/', authMiddleware, async (req, res) => {
       return;
     }
 
-    // Find the user's chat document, or create it if it doesn't exist
-    let chatDoc = await Chat.findOne({ userId });
-    if (!chatDoc) {
-      chatDoc = new Chat({ tenantId, userId, messages: [] });
-    }
-    // Store user message
-    chatDoc.messages.push({ sender: 'user', text: query });
-    await chatDoc.save(); // Save user message immediately
+    // Atomically find, create if not exists, and push the new message
+    const chatDoc = await Chat.findOneAndUpdate(
+      { userId },
+      { 
+        $setOnInsert: { tenantId, userId },
+        $push: { messages: { sender: 'user', text: query } }
+      },
+      { upsert: true, new: true }
+    );
 
     // Recent Messages (Fetch last 10 BEFORE the current user message was added)
     const recentMessagesForAgent = chatDoc.messages.slice(-11, -1).map((m) => ({
@@ -95,22 +96,23 @@ router.get('/', authMiddleware, async (req, res) => {
     const { finalAnswer, tableData, mongoQuery, schemaContext } = finalState;
 
     if (finalAnswer) {
-      // Ensure there is something to save
-      chatDoc.messages.push({
-        sender: 'agent',
-        text:
-          typeof finalAnswer === 'string'
-            ? finalAnswer
-            : JSON.stringify(finalAnswer),
-        // Store relevant structured data from the agent's final state
-        data: {
-          mongoQuery: mongoQuery || null, // Ensure mongoQuery exists
-          // schemaContext: schemaContext, // Avoid saving large schema context if not needed for display
-          rawResult: tableData?.rows || null, // Keep raw results if needed
-          tableData: tableData || null, // Store table config and viz config
-        },
-      });
-      await chatDoc.save(); // Save the final agent message
+      // Ensure there is something to save, use updateOne to avoid VersionError
+      await Chat.updateOne(
+        { userId },
+        {
+          $push: {
+            messages: {
+              sender: 'agent',
+              text: typeof finalAnswer === 'string' ? finalAnswer : JSON.stringify(finalAnswer),
+              data: {
+                mongoQuery: mongoQuery || null,
+                rawResult: tableData?.rows || null,
+                tableData: tableData || null,
+              }
+            }
+          }
+        }
+      );
     } else {
       console.warn(
         'Agent stream finished but no finalAnswer found in finalState.'

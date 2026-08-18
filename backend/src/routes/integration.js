@@ -4,6 +4,7 @@ import Integration from '../models/Integration.js';
 import { MongoClient } from 'mongodb';
 import { authMiddleware } from '../middleware/auth.js';
 import { encrypt, decrypt } from '../utils/crypto.js';
+import { closeTenantDb } from '../utils/mongoClient.js';
 
 const router = express.Router();
 
@@ -143,6 +144,8 @@ router.put('/', authMiddleware, async (req, res) => {
 
     integration.connectionUri = decrypt(integration.connectionUri);
 
+    await closeTenantDb(req.user.tenantId);
+
     res.json({ status: true, integration });
   } catch (err) {
     console.error('Update Integration Error:', err);
@@ -169,6 +172,8 @@ router.delete('/:id', authMiddleware, async (req, res) => {
         .status(404)
         .json({ status: false, error: 'Integration not found' });
     }
+
+    await closeTenantDb(req.user.tenantId);
 
     res.json({ status: true, message: 'Integration removed' });
   } catch (err) {
