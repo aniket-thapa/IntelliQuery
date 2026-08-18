@@ -27,6 +27,8 @@ import {
 } from '@/components/ui/tooltip';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import api from '../../lib/api';
 import { toast } from 'sonner';
 
@@ -65,11 +67,13 @@ const useChat = (token) => {
   const [hasMore, setHasMore] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const eventSourceRef = useRef(null); // Ref to hold the EventSource instance
+  const isLoadingMoreRef = useRef(false);
 
   const fetchMessages = useCallback(
     async (page) => {
-      if (isLoadingMore || !token) return;
+      if (isLoadingMoreRef.current || !token) return;
 
+      isLoadingMoreRef.current = true;
       setIsLoadingMore(true);
       try {
         const response = await api.get(`/chat/messages?limit=20&page=${page}`);
@@ -91,10 +95,11 @@ const useChat = (token) => {
         toast.error('Failed to fetch messages.');
         setHasMore(false);
       } finally {
+        isLoadingMoreRef.current = false;
         setIsLoadingMore(false);
       }
     },
-    [token, isLoadingMore]
+    [token]
   );
 
   useEffect(() => {
@@ -113,10 +118,10 @@ const useChat = (token) => {
   }, [token]);
 
   const loadMoreMessages = useCallback(() => {
-    if (hasMore && !isLoadingMore) {
+    if (hasMore && !isLoadingMoreRef.current) {
       fetchMessages(currentPage + 1);
     }
-  }, [hasMore, isLoadingMore, currentPage, fetchMessages]);
+  }, [hasMore, currentPage, fetchMessages]);
 
   const sendMessage = useCallback(
     async (query) => {
@@ -277,10 +282,6 @@ const useChat = (token) => {
 // This now uses CSS variables from ShadCN/Tailwind for theme-awareness
 const ChartRenderer = ({ visualization }) => {
   if (!visualization || !visualization.data || !visualization.type) {
-    console.log(
-      'ChartRenderer: Invalid or missing visualization data',
-      visualization
-    );
     return null;
   }
 
@@ -342,7 +343,6 @@ const ChartRenderer = ({ visualization }) => {
     !chartData.datasets ||
     chartData.datasets.length === 0
   ) {
-    console.log('ChartRenderer: Empty labels or datasets', chartData);
     return (
       <div className="my-4 p-4 text-center text-muted-foreground">
         No data available for chart.
@@ -375,24 +375,28 @@ const getNestedValue = (obj, path) => {
 };
 
 const resolveRows = (originalRows, columns) => {
-  if (!originalRows || originalRows.length === 0 || !columns) return [];
+  if (!originalRows || !Array.isArray(originalRows) || originalRows.length === 0 || !columns) return [];
   
-  const hasAnyKey = columns.some(col => getNestedValue(originalRows[0], col.key) !== undefined);
-  if (hasAnyKey) return originalRows;
+  try {
+    const hasAnyKey = columns.some(col => getNestedValue(originalRows[0], col.key) !== undefined);
+    if (hasAnyKey) return originalRows;
 
-  if (originalRows.length === 1) {
-    const row = originalRows[0];
-    for (const key in row) {
-      if (Array.isArray(row[key]) && row[key].length > 0) {
-        const firstItem = row[key][0];
-        if (typeof firstItem === 'object' && firstItem !== null) {
-          const arrayHasAnyKey = columns.some(col => getNestedValue(firstItem, col.key) !== undefined);
-          if (arrayHasAnyKey) {
-            return row[key];
+    if (originalRows.length === 1) {
+      const row = originalRows[0];
+      for (const key in row) {
+        if (Array.isArray(row[key]) && row[key].length > 0) {
+          const firstItem = row[key][0];
+          if (typeof firstItem === 'object' && firstItem !== null) {
+            const arrayHasAnyKey = columns.some(col => getNestedValue(firstItem, col.key) !== undefined);
+            if (arrayHasAnyKey) {
+              return row[key];
+            }
           }
         }
       }
     }
+  } catch (e) {
+    console.warn("resolveRows encountered an error", e);
   }
   return originalRows;
 };
@@ -503,7 +507,28 @@ const ChatMessageComponent = memo(({ message, onDelete }) => {
         <div className={proseClass}>
           {/* Render markdown text */}
           {message.text && (
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            <ReactMarkdown 
+              remarkPlugins={[remarkGfm]}
+              components={{
+                code({node, inline, className, children, ...props}) {
+                  const match = /language-(\w+)/.exec(className || '')
+                  return !inline && match ? (
+                    <SyntaxHighlighter
+                      {...props}
+                      children={String(children).replace(/\n$/, '')}
+                      style={vscDarkPlus}
+                      language={match[1]}
+                      PreTag="div"
+                      className="rounded-md my-4"
+                    />
+                  ) : (
+                    <code {...props} className={className}>
+                      {children}
+                    </code>
+                  )
+                }
+              }}
+            >
               {message.text}
             </ReactMarkdown>
           )}
@@ -739,7 +764,28 @@ const StreamingMessageComponent = memo(({ currentStep, partialAnswer }) => {
           </div>
           {partialAnswer ? (
             <div className={proseClass}>
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <ReactMarkdown 
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  code({node, inline, className, children, ...props}) {
+                    const match = /language-(\w+)/.exec(className || '')
+                    return !inline && match ? (
+                      <SyntaxHighlighter
+                        {...props}
+                        children={String(children).replace(/\n$/, '')}
+                        style={vscDarkPlus}
+                        language={match[1]}
+                        PreTag="div"
+                        className="rounded-md my-4"
+                      />
+                    ) : (
+                      <code {...props} className={className}>
+                        {children}
+                      </code>
+                    )
+                  }
+                }}
+              >
                 {partialAnswer}
               </ReactMarkdown>
               <span style={cursorStyle}></span> {/* Add blinking cursor span */}
@@ -772,6 +818,7 @@ export default function DashboardPage() {
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef(null);
   const scrollAreaRef = useRef(null);
+  const textareaRef = useRef(null);
   const [isScrolledToBottom, setIsScrolledToBottom] = useState(true);
 
   const {
@@ -813,6 +860,9 @@ export default function DashboardPage() {
     if (inputValue.trim() && !isStreaming) {
       sendMessage(inputValue);
       setInputValue('');
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto'; // Reset height
+      }
       setIsScrolledToBottom(true);
       // Force scroll to bottom immediately on send
       setTimeout(() => {
@@ -820,6 +870,14 @@ export default function DashboardPage() {
           scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
         }
       }, 0);
+    }
+  };
+
+  const handleInputChange = (e) => {
+    setInputValue(e.target.value);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 150)}px`;
     }
   };
 
@@ -919,9 +977,10 @@ export default function DashboardPage() {
           <div className="flex items-end gap-2">
             <div className="flex-1 relative">
               <Textarea
+                ref={textareaRef}
                 rows={1}
                 value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
+                onChange={handleInputChange}
                 onKeyDown={handleKeyPress}
                 placeholder="Ask a question about your data..."
                 disabled={isStreaming}
