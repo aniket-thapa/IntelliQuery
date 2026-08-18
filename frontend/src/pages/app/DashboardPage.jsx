@@ -144,14 +144,35 @@ const useChat = (token) => {
       setCurrentStep('starting');
       setPartialAnswer('');
 
-      const eventSourceUrl = `${
-        api.defaults.baseURL
-      }/chat?query=${encodeURIComponent(query)}&token=${token}`;
+      const eventSourceUrl = `${api.defaults.baseURL
+        }/chat?query=${encodeURIComponent(query)}&token=${token}`;
       eventSourceRef.current = new EventSource(eventSourceUrl);
 
       let finalAgentData = null;
 
       eventSourceRef.current.onmessage = (event) => {
+        if (event.data === '[DONE]') {
+          console.log('SSE stream completed.');
+          if (eventSourceRef.current) eventSourceRef.current.close();
+          setIsStreaming(false);
+          setCurrentStep('');
+          eventSourceRef.current = null;
+
+          if (finalAgentData && (finalAgentData.finalAnswer || finalAgentData.tableData?.rows)) {
+            fetchMessages(1);
+            setPartialAnswer('');
+          } else if (partialAnswer) {
+            console.warn('Stream closed, using partialAnswer as final message.');
+            fetchMessages(1);
+            setPartialAnswer('');
+          } else {
+            console.warn('Stream closed but no final data or partial answer was available.');
+            // Refetch anyway just in case backend saved something
+            fetchMessages(1);
+          }
+          return;
+        }
+
         try {
           const streamData = JSON.parse(event.data);
 
@@ -191,32 +212,6 @@ const useChat = (token) => {
         setPartialAnswer('');
         eventSourceRef.current = null;
       };
-
-      eventSourceRef.current.addEventListener('close', () => {
-        console.log('SSE stream closed by server.');
-        if (eventSourceRef.current) {
-          eventSourceRef.current.close();
-        }
-        setIsStreaming(false);
-        setCurrentStep('');
-        eventSourceRef.current = null;
-
-        if (
-          finalAgentData &&
-          (finalAgentData.finalAnswer || finalAgentData.tableData?.rows)
-        ) {
-          fetchMessages(1);
-          setPartialAnswer('');
-        } else if (partialAnswer) {
-          console.warn('Stream closed, using partialAnswer as final message.');
-          fetchMessages(1);
-          setPartialAnswer('');
-        } else {
-          console.warn(
-            'Stream closed but no final data or partial answer was available.'
-          );
-        }
-      });
     },
     [isStreaming, token, fetchMessages, partialAnswer] // Added partialAnswer
   );
@@ -364,10 +359,10 @@ const ChartRenderer = ({ visualization }) => {
 const getNestedValue = (obj, path) => {
   if (obj === null || obj === undefined) return undefined;
   if (Object.prototype.hasOwnProperty.call(obj, path)) return obj[path];
-  
+
   const parts = path.split('.');
   if (parts.length === 1) return undefined;
-  
+
   return parts.reduce((acc, part) => {
     if (acc === null || acc === undefined) return undefined;
     return acc[part];
@@ -376,7 +371,7 @@ const getNestedValue = (obj, path) => {
 
 const resolveRows = (originalRows, columns) => {
   if (!originalRows || !Array.isArray(originalRows) || originalRows.length === 0 || !columns) return [];
-  
+
   try {
     const hasAnyKey = columns.some(col => getNestedValue(originalRows[0], col.key) !== undefined);
     if (hasAnyKey) return originalRows;
@@ -454,63 +449,110 @@ const exportToCsv = (filename, tableConfig, rows) => {
 
 // --- ChatMessage Component (Keep as-is, it's correct) ---
 const ChatMessageComponent = memo(({ message, onDelete }) => {
-  // ... (Your existing ChatMessageComponent code)
   const isAgent = message.sender === 'agent';
 
-  // --- FIX: Access data correctly ---
-  const tableData = message.data?.tableData; // Access the nested tableData object
+  const tableData = message.data?.tableData;
   const visualization = tableData?.visualization;
   const tableConfig = tableData?.tableConfig;
   const rows = tableData?.rows;
   const displayRows = rows && tableConfig ? resolveRows(rows, tableConfig.columns) : rows;
-  // --- END FIX ---
 
-  const messageClass = `group relative flex gap-2 sm:gap-4 px-4 py-5 sm:py-6 animate-in fade-in slide-in-from-bottom-4 duration-500 ${
-    isAgent
-      ? 'bg-muted/30 rounded-lg'
-      : 'mt-2 sm:mt-4 pt-4 sm:pt-8 border-t border-border'
-  }`;
-  const avatarClass = `flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-    isAgent
-      ? 'bg-primary text-primary-foreground'
-      : 'bg-secondary text-secondary-foreground'
-  }`;
-  const proseClass =
-    'prose prose-sm max-w-none dark:prose-invert prose-p:leading-relaxed prose-pre:bg-muted/50 prose-pre:border prose-pre:border-border/50 py-2 rounded';
-
-  // --- Handler for the Export Button ---
   const handleExportClick = () => {
-    const filename = `intelliquery_export_${
-      new Date().toISOString().split('T')[0]
-    }.csv`;
+    const filename = `intelliquery_export_${new Date().toISOString().split('T')[0]}.csv`;
     exportToCsv(filename, tableConfig, displayRows);
     toast.success('CSV Exported!');
   };
 
-  return (
-    <div className={messageClass}>
-      <div className={avatarClass}>
-        {isAgent ? <Bot className="w-5 h-5" /> : <User className="w-4 h-4" />}
-      </div>
-      <div className="flex-1 space-y-2 overflow-hidden">
-        <div className="flex items-center gap-2">
-          <span className="font-semibold text-sm text-foreground">
-            {isAgent ? 'AI Assistant' : 'You'}
-          </span>
-          <span className="text-xs text-muted-foreground">
-            {new Date(message.createdAt).toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </span>
+  if (!isAgent) {
+    return (
+      <div className="group relative flex flex-col items-end px-4 py-3 sm:px-6 md:px-8 animate-in fade-in slide-in-from-bottom-4 duration-500 w-full max-w-5xl mx-auto">
+        <div className="flex items-center gap-2 mb-1.5 opacity-70 px-1">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">You</span>
         </div>
-        <div className={proseClass}>
-          {/* Render markdown text */}
+        <div className="relative group/bubble flex flex-row items-center gap-2 max-w-[85%] sm:max-w-[75%]">
+          {message._id && !message._id.startsWith('temp-') && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="h-7 w-7 opacity-0 md:group-hover/bubble:opacity-100 transition-opacity rounded-full hover:bg-muted text-muted-foreground self-center"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                  <span className="sr-only">Message options</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive focus:bg-destructive/10 gap-2 cursor-pointer"
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    onDelete(message._id);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete Message
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          <div className="bg-gradient-to-br from-primary to-primary/90 text-primary-foreground px-5 py-3 rounded-2xl rounded-tr-sm shadow-md break-words min-w-0">
+            <div className="text-sm text-primary-foreground/95 [&>p]:leading-relaxed [&>p]:m-0 [&>p]:text-primary-foreground/95 [&_strong]:text-primary-foreground [&_strong]:font-semibold">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.text}</ReactMarkdown>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="group relative flex gap-4 px-4 py-6 sm:px-6 md:px-8 animate-in fade-in slide-in-from-bottom-4 duration-500 w-full max-w-5xl mx-auto">
+      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary border border-primary/20 flex items-center justify-center mt-0.5 shadow-sm">
+        <Bot className="w-5 h-5" />
+      </div>
+      <div className="flex-1 space-y-3 min-w-0">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-sm text-foreground">AI Assistant</span>
+            <span className="text-xs text-muted-foreground/60 font-medium">
+              {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+          {message._id && !message._id.startsWith('temp-') && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity rounded-full hover:bg-muted text-muted-foreground"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                  <span className="sr-only">Message options</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive focus:bg-destructive/10 gap-2 cursor-pointer"
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    onDelete(message._id);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete Message
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+
+        <div className="prose prose-sm max-w-none dark:prose-invert prose-p:leading-relaxed prose-pre:bg-muted/50 prose-pre:border prose-pre:border-border/50 rounded">
           {message.text && (
-            <ReactMarkdown 
+            <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
-                code({node, inline, className, children, ...props}) {
+                code({ node, inline, className, children, ...props }) {
                   const match = /language-(\w+)/.exec(className || '')
                   return !inline && match ? (
                     <SyntaxHighlighter
@@ -519,10 +561,10 @@ const ChatMessageComponent = memo(({ message, onDelete }) => {
                       style={vscDarkPlus}
                       language={match[1]}
                       PreTag="div"
-                      className="rounded-md my-4"
+                      className="rounded-lg border border-border/50 shadow-sm my-4 text-[13px]"
                     />
                   ) : (
-                    <code {...props} className={className}>
+                    <code {...props} className={`${className} bg-muted px-1.5 py-0.5 rounded-md text-primary font-mono text-[13px]`}>
                       {children}
                     </code>
                   )
@@ -533,29 +575,24 @@ const ChatMessageComponent = memo(({ message, onDelete }) => {
             </ReactMarkdown>
           )}
 
-          {/* Render table data if present (using corrected paths) */}
-          {isAgent && tableConfig && rows && rows.length > 0 && (
-            <div className="md:my-12 my-8 relative group/table">
-              {/* Added relative positioning and group */}
-              <div className="max-h-[75vh] overflow-x-auto border border-border/50 rounded-md">
-                <table className="max-w-full divide-y divide-border/50">
-                  <thead className="bg-muted/50">
+          {tableConfig && rows && rows.length > 0 && (
+            <div className="md:my-6 my-4 relative group/table">
+              <div className="max-h-[60vh] overflow-x-auto border border-border/60 rounded-xl shadow-sm bg-card/50 backdrop-blur-sm scrollbar-thin">
+                <table className="w-full divide-y divide-border/60 text-sm">
+                  <thead className="bg-muted/50 sticky top-0 z-10 backdrop-blur-md">
                     <tr>
                       {tableConfig.columns.map((col) => (
-                        <th
-                          key={col.key}
-                          className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider"
-                        >
+                        <th key={col.key} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                           {col.header}
                         </th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border/50">
+                  <tbody className="divide-y divide-border/40">
                     {displayRows.map((row, rowIndex) => (
-                      <tr key={rowIndex} className="hover:bg-muted/20">
+                      <tr key={rowIndex} className="hover:bg-muted/30 transition-colors">
                         {tableConfig.columns.map((col) => (
-                          <td key={col.key} className="px-4 py-2 text-sm">
+                          <td key={col.key} className="px-4 py-2.5 text-foreground/90 whitespace-nowrap">
                             {renderCellContent(getNestedValue(row, col.key), col)}
                           </td>
                         ))}
@@ -564,57 +601,27 @@ const ChatMessageComponent = memo(({ message, onDelete }) => {
                   </tbody>
                 </table>
               </div>
-              {/* Export Button - positioned top-right of the table container */}
               <TooltipProvider>
                 <TooltipTrigger asChild>
                   <Button
                     variant="outline"
                     size="icon-sm"
-                    className="absolute -top-3 right-0 h-7 w-7 md:opacity-0 md:group-hover/table:opacity-100 transition-opacity duration-200 bg-background hover:bg-muted"
+                    className="absolute -top-3 -right-3 h-8 w-8 rounded-full shadow-sm md:opacity-0 md:group-hover/table:opacity-100 transition-all duration-200 bg-background hover:bg-muted hover:scale-105 border-border"
                     onClick={handleExportClick}
                   >
-                    <Download className="h-4 w-4" />
+                    <Download className="h-4 w-4 text-muted-foreground" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent side="top" align="center">
-                  <p>Export table as CSV</p>
+                <TooltipContent side="top" align="center" className="text-xs">
+                  <p>Export CSV</p>
                 </TooltipContent>
               </TooltipProvider>
             </div>
           )}
 
-          {/* Render Visualization if present (using corrected path) */}
-          {isAgent && visualization && (
-            <ChartRenderer visualization={visualization} />
-          )}
+          {visualization && <ChartRenderer visualization={visualization} />}
         </div>
       </div>
-      {message._id && !message._id.startsWith('temp-') && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="absolute top-2 right-2 h-7 w-7 md:opacity-0 md:group-hover:opacity-100 md:transition-opacity"
-            >
-              <MoreHorizontal className="h-4 w-4" />
-              <span className="sr-only">Message options</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive focus:bg-destructive/10 gap-2 cursor-pointer"
-              onSelect={(e) => {
-                e.preventDefault();
-                onDelete(message._id);
-              }}
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete Message
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
     </div>
   );
 });
@@ -632,18 +639,18 @@ const renderCellContent = (value, columnConfig) => {
         return isNaN(date.getTime())
           ? String(value)
           : date.toLocaleDateString(undefined, {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-            });
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+          });
       }
 
       case 'currency':
         return typeof value === 'number'
           ? `$${value.toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}`
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}`
           : String(value);
 
       case 'link': {
@@ -704,28 +711,18 @@ const renderCellContent = (value, columnConfig) => {
 
 // --- StreamingMessage Component (keep as-is) ---
 const StreamingMessageComponent = memo(({ currentStep, partialAnswer }) => {
-  // ... (Your existing StreamingMessageComponent code)
-  const messageClass =
-    'flex gap-4 px-4 py-5 sm:px-6 sm:py-6 bg-muted/30 animate-in fade-in slide-in-from-bottom-4 duration-500';
-  const avatarClass =
-    'flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center';
-  const stepClass =
-    'flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/10 text-primary text-xs';
-  const proseClass =
-    'prose prose-sm max-w-none dark:prose-invert prose-p:leading-relaxed prose-pre:bg-muted/50 prose-pre:border prose-pre:border-border/50 p-2 rounded';
-  const thinkingClass = 'flex items-center gap-2 text-muted-foreground';
-  const dotClass =
-    'w-1.5 h-1.5 bg-muted-foreground/60 rounded-full animate-bounce';
+  const stepClass = 'flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-[11px] font-medium tracking-wide uppercase shadow-sm border border-primary/20';
+  const dotClass = 'w-1.5 h-1.5 bg-muted-foreground/60 rounded-full animate-bounce';
 
-  // Blinking cursor style
   const cursorStyle = {
     display: 'inline-block',
-    width: '8px', // Adjust width as needed
-    height: '1em', // Match line height
-    backgroundColor: 'currentColor', // Use text color
+    width: '6px',
+    height: '1.2em',
+    backgroundColor: 'currentColor',
     animation: 'blink 1s step-end infinite',
-    marginLeft: '2px', // Space before cursor
+    marginLeft: '4px',
     verticalAlign: 'text-bottom',
+    opacity: 0.8
   };
 
   const keyframes = `
@@ -737,24 +734,22 @@ const StreamingMessageComponent = memo(({ currentStep, partialAnswer }) => {
 
   return (
     <>
-      <style>{keyframes}</style> {/* Inject keyframes */}
-      <div className={messageClass}>
-        <div className={avatarClass}>
-          <Bot className="w-5 h-5" />
+      <style>{keyframes}</style>
+      <div className="group relative flex gap-4 px-4 py-6 sm:px-6 md:px-8 animate-in fade-in slide-in-from-bottom-4 duration-500 w-full max-w-5xl mx-auto">
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary border border-primary/20 flex items-center justify-center mt-0.5 shadow-sm">
+          <Bot className="w-5 h-5 animate-pulse" />
         </div>
-        <div className="flex-1 space-y-3 overflow-hidden">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-sm text-foreground">
-              AI Assistant
-            </span>
+        <div className="flex-1 space-y-4 min-w-0">
+          <div className="flex items-center gap-3">
+            <span className="font-semibold text-sm text-foreground">AI Assistant</span>
             {currentStep && (
               <div className={stepClass}>
                 <Loader2 className="w-3 h-3 animate-spin" />
-                <span className="capitalize">
+                <span>
                   {currentStep
                     .replace(/_/g, ' ')
-                    .replace('queryClassifier', 'Analyzing request')
-                    .replace('schemaSearch', 'Analyzing Schema')
+                    .replace('queryClassifier', 'Analyzing Request')
+                    .replace('schemaSearch', 'Searching Schema')
                     .replace('queryGen', 'Generating Query')
                     .replace('executor', 'Executing Query')
                     .replace('responseFormatter', 'Formatting Response')}
@@ -763,11 +758,11 @@ const StreamingMessageComponent = memo(({ currentStep, partialAnswer }) => {
             )}
           </div>
           {partialAnswer ? (
-            <div className={proseClass}>
-              <ReactMarkdown 
+            <div className="prose prose-sm max-w-none dark:prose-invert prose-p:leading-relaxed rounded">
+              <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
-                  code({node, inline, className, children, ...props}) {
+                  code({ node, inline, className, children, ...props }) {
                     const match = /language-(\w+)/.exec(className || '')
                     return !inline && match ? (
                       <SyntaxHighlighter
@@ -776,10 +771,10 @@ const StreamingMessageComponent = memo(({ currentStep, partialAnswer }) => {
                         style={vscDarkPlus}
                         language={match[1]}
                         PreTag="div"
-                        className="rounded-md my-4"
+                        className="rounded-lg border border-border/50 shadow-sm my-4 text-[13px]"
                       />
                     ) : (
-                      <code {...props} className={className}>
+                      <code {...props} className={`${className} bg-muted px-1.5 py-0.5 rounded-md text-primary font-mono text-[13px]`}>
                         {children}
                       </code>
                     )
@@ -788,22 +783,15 @@ const StreamingMessageComponent = memo(({ currentStep, partialAnswer }) => {
               >
                 {partialAnswer}
               </ReactMarkdown>
-              <span style={cursorStyle}></span> {/* Add blinking cursor span */}
+              <span style={cursorStyle}></span>
             </div>
           ) : (
-            <div className={thinkingClass}>
-              <div className="flex gap-1">
+            <div className="flex items-center gap-2 text-muted-foreground/70 py-1">
+              <div className="flex gap-1.5">
                 <span className={dotClass} style={{ animationDelay: '0ms' }} />
-                <span
-                  className={dotClass}
-                  style={{ animationDelay: '150ms' }}
-                />
-                <span
-                  className={dotClass}
-                  style={{ animationDelay: '300ms' }}
-                />
+                <span className={dotClass} style={{ animationDelay: '150ms' }} />
+                <span className={dotClass} style={{ animationDelay: '300ms' }} />
               </div>
-              <span className="text-sm">Thinking...</span>
             </div>
           )}
         </div>
@@ -889,56 +877,49 @@ export default function DashboardPage() {
   };
 
   return (
-    // This div now fills its parent <main> tag from AppLayout
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full bg-background relative overflow-hidden">
+      {/* Background ambient light */}
+      <div className="absolute top-0 inset-x-0 h-64 bg-gradient-to-b from-primary/5 to-transparent pointer-events-none -z-10" />
+
       {/* Messages Area */}
-      {/* This div takes up all available space and becomes the inner scroller for messages */}
       <div
-        className="flex-1 overflow-y-auto"
+        className="flex-1 overflow-y-auto scroll-smooth scrollbar-thin pb-32"
         onScroll={handleScroll}
         ref={scrollAreaRef}
       >
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4">
-          {/* Load More Indicator */}
+        <div className="w-full">
           {hasMore && (
-            <div className="flex justify-center py-4">
+            <div className="flex justify-center py-6">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={loadMoreMessages}
                 disabled={isLoadingMore}
-                className="gap-2 text-muted-foreground hover:text-foreground"
+                className="gap-2 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted/50 border border-transparent hover:border-border/30 transition-all shadow-sm"
               >
                 {isLoadingMore ? (
-                  <>
-                    {' '}
-                    <LoaderCircle className="w-4 h-4 animate-spin" /> Loading...{' '}
-                  </>
+                  <><LoaderCircle className="w-4 h-4 animate-spin" /> Loading...</>
                 ) : (
-                  <>
-                    {' '}
-                    <ChevronUp className="w-4 h-4" /> Load older messages{' '}
-                  </>
+                  <><ChevronUp className="w-4 h-4" /> Load older messages</>
                 )}
               </Button>
             </div>
           )}
-          {/* Messages */}
+
           {messages.length === 0 && !isStreaming && !isLoadingMore ? (
-            <div className="flex flex-col items-center justify-center pt-20 pb-10 text-center">
-              <div className="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-5">
-                <Bot className="w-8 h-8 text-primary" />
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4 animate-in fade-in duration-700">
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-primary/20 to-primary/5 flex items-center justify-center mb-6 shadow-sm border border-primary/10">
+                <Bot className="w-10 h-10 text-primary" />
               </div>
-              <h2 className="text-xl font-semibold mb-2 text-foreground">
-                Ask IntelliQuery Anything
+              <h2 className="text-2xl font-bold tracking-tight text-foreground mb-3">
+                Hello, I'm IntelliQuery.
               </h2>
-              <p className="text-muted-foreground text-sm max-w-sm">
-                I can understand your data schema and answer questions in
-                natural language, generating insights and visualizations.
+              <p className="text-muted-foreground/80 max-w-md text-base leading-relaxed">
+                I can understand your database schema and answer complex questions in natural language. Ask me to generate insights, tables, or charts!
               </p>
             </div>
           ) : (
-            <div className="space-y-0">
+            <div className="w-full space-y-2 py-4">
               {messages.map((message, index) => (
                 <ChatMessageComponent
                   key={message._id || `msg-${index}`}
@@ -954,61 +935,59 @@ export default function DashboardPage() {
               )}
             </div>
           )}
-          <div ref={messagesEndRef} className="h-1" /> {/* Scroll anchor */}
+          <div ref={messagesEndRef} className="h-px" />
         </div>
       </div>
 
-      {/* Input Area */}
-      {/* This is no longer sticky. It's just the last element in a flex-col container. */}
-      <div className="border-t border-border bg-card/95 backdrop-blur-sm">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3">
+      {/* Input Area (Glassmorphism) */}
+      <div className="absolute bottom-0 w-full bg-background/70 backdrop-blur-xl border-t border-border/40 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] dark:shadow-[0_-10px_40px_rgba(0,0,0,0.2)]">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4">
           {isStreaming && (
-            <div className="flex justify-center mb-3">
+            <div className="flex justify-center mb-4 absolute -top-12 left-0 right-0">
               <Button
                 onClick={stopGenerating}
                 variant="outline"
                 size="sm"
-                className="gap-2 rounded-full px-4 text-xs shadow-sm bg-background/80 hover:bg-muted"
+                className="gap-2 rounded-full px-5 py-1 text-[13px] font-medium shadow-md bg-background/90 hover:bg-muted border-border/60 hover:scale-105 transition-transform"
               >
                 <Square className="w-3 h-3 fill-current" /> Stop generating
               </Button>
             </div>
           )}
-          <div className="flex items-end gap-2">
-            <div className="flex-1 relative">
+          <div className="relative flex items-end gap-2 group/input">
+            <div className="flex-1 relative rounded-2xl overflow-hidden shadow-sm border border-input focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20 transition-all bg-card/50">
               <Textarea
                 ref={textareaRef}
                 rows={1}
                 value={inputValue}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyPress}
-                placeholder="Ask a question about your data..."
+                placeholder="Ask anything about your data..."
                 disabled={isStreaming}
-                className="pr-12 py-3 text-sm resize-none bg-background border-input focus-visible:ring-1 focus-visible:ring-primary/50 focus-visible:ring-offset-0 rounded-lg shadow-sm block w-full min-h-[44px] max-h-[150px] overflow-y-auto hide-scrollbar"
+                className="w-full min-h-[52px] max-h-[200px] bg-transparent border-0 py-3.5 pl-4 pr-14 text-[15px] resize-none focus-visible:ring-0 placeholder:text-muted-foreground/60 scrollbar-thin"
               />
-              <Button
-                onClick={handleSend}
-                disabled={!inputValue.trim() || isStreaming}
-                size="icon"
-                className="absolute right-2 bottom-1.5 rounded-md h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-                variant="ghost"
-              >
-                {isStreaming ? (
-                  <LoaderCircle className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Send className="w-4 h-4" />
-                )}
-                <span className="sr-only">Send</span>
-              </Button>
+              <div className="absolute right-2 bottom-2">
+                <Button
+                  onClick={handleSend}
+                  disabled={!inputValue.trim() || isStreaming}
+                  size="icon"
+                  className={`h-9 w-9 rounded-xl transition-all duration-300 ${inputValue.trim() && !isStreaming ? 'bg-primary text-primary-foreground shadow-md hover:bg-primary/90' : 'bg-muted text-muted-foreground'}`}
+                >
+                  {isStreaming ? (
+                    <LoaderCircle className="w-4.5 h-4.5 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4 ml-0.5" />
+                  )}
+                  <span className="sr-only">Send</span>
+                </Button>
+              </div>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground mt-1.5 text-center px-2">
-            Shift+Enter for new line. AI may make mistakes.
+          <p className="text-[11px] text-muted-foreground/60 mt-2.5 text-center px-2 font-medium">
+            AI can make mistakes. Verify important information.
           </p>
         </div>
       </div>
-      {/* Helper style to hide scrollbar on the textarea */}
-      <style>{`.hide-scrollbar::-webkit-scrollbar { display: none; } .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }`}</style>
     </div>
   );
 }

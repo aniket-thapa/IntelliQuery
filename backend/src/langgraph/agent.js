@@ -241,19 +241,27 @@ Provide only the valid JSON object and nothing else.
 
     // 5) Response formatter - user friendly + tableData
     .addNode('responseFormatter', async (state) => {
-      const rows = state.result?.rows ?? [];
-      const error = state.result?.error;
-      const context = {
-        userQuery: state.userQuery,
-        schemaContext: state.schemaContext,
-        rows,
-        error,
-      };
-      const { finalAnswer, tableData } = await formatResponse({
-        context,
-        model,
-      });
-      return { finalAnswer, tableData };
+      try {
+        const rows = state.result?.rows ?? [];
+        const error = state.result?.error;
+        const context = {
+          userQuery: state.userQuery,
+          schemaContext: state.schemaContext,
+          rows,
+          error,
+        };
+        const { finalAnswer, tableData } = await formatResponse({
+          context,
+          model,
+        });
+        return { finalAnswer, tableData };
+      } catch (err) {
+        console.error('Error in responseFormatter:', err);
+        return { 
+          finalAnswer: "I encountered an error while trying to format the response. Please try asking your question differently.",
+          tableData: null
+        };
+      }
     });
 
   // --- Graph Edges (Routing) ---

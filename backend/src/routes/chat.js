@@ -9,21 +9,21 @@ const router = express.Router();
 
 // POST /api/chat (using GET with query param for EventSource)
 router.get('/', authMiddleware, async (req, res) => {
-  // Changed POST to GET for EventSource compatibility
   try {
-    const { query } = req.query; // Get query from query params
+    const { query } = req.query;
 
     if (!query) {
-      // Cannot send 400 status directly with EventSource, handle differently or validate before opening stream
       console.error('Chat route error: Query is required');
-      res.status(400).end('Query is required'); // End connection with error status
+      res.status(400).json({ error: 'Query is required' });
       return;
     }
+    
     const tenantId = req.user.tenantId;
     const userId = req.user.id;
+    
     if (!tenantId) {
       console.error('Chat route error: Tenant is required');
-      res.status(400).end('Tenant is required');
+      res.status(400).json({ error: 'Tenant is required' });
       return;
     }
 
@@ -39,9 +39,7 @@ router.get('/', authMiddleware, async (req, res) => {
 
     // Recent Messages (Fetch last 10 BEFORE the current user message was added)
     const recentMessagesForAgent = chatDoc.messages.slice(-11, -1).map((m) => ({
-      // Get 10 previous messages
       sender: m.sender,
-      // Simplify context for agent: send agent's query/summary, not full data object
       text:
         m.sender === 'agent'
           ? m.data?.mongoQuery
@@ -54,12 +52,12 @@ router.get('/', authMiddleware, async (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
-    res.flushHeaders(); // Send headers immediately
+    res.flushHeaders(); 
 
-    // invoke agent
+    // Invoke agent
     const agent = buildAgent();
-
     const abortController = new AbortController();
+    
     req.on('close', () => {
       console.log('Client closed connection. Aborting agent...');
       abortController.abort();
@@ -68,35 +66,31 @@ router.get('/', authMiddleware, async (req, res) => {
     const stream = await agent.stream({
       tenantId,
       userQuery: query,
-      recentMessages: recentMessagesForAgent, // Use specifically fetched recent messages
+      recentMessages: recentMessagesForAgent,
     }, {
       signal: abortController.signal
     });
 
-    let finalState = {};
-    let lastSentStepData = null; // Keep track of the last data sent
+    // Safely track the final results generated from various steps
+    let finalAnswer = null;
+    let tableData = null;
+    let mongoQuery = null;
 
     for await (const chunk of stream) {
       const stepName = Object.keys(chunk)[0];
       const stepOutput = chunk[stepName];
 
-      // Send an update for each step
       const dataToSend = { step: stepName, data: stepOutput };
       res.write(`data: ${JSON.stringify(dataToSend)}\n\n`);
-      lastSentStepData = dataToSend; // Update last sent data
 
-      // Update the accumulating final state (in case needed after loop)
-      // Merge stepOutput into finalState, handling potential nested objects if necessary
-      Object.keys(stepOutput).forEach((key) => {
-        finalState[key] = stepOutput[key];
-      });
+      // Safely extract properties if they appear in this step
+      if (stepOutput.finalAnswer !== undefined) finalAnswer = stepOutput.finalAnswer;
+      if (stepOutput.tableData !== undefined) tableData = stepOutput.tableData;
+      if (stepOutput.mongoQuery !== undefined) mongoQuery = stepOutput.mongoQuery;
     }
 
-    // --- FIX: Only save the final agent response ONCE ---
-    const { finalAnswer, tableData, mongoQuery, schemaContext } = finalState;
-
+    // Only save the final agent response ONCE if we produced an answer
     if (finalAnswer) {
-      // Ensure there is something to save, use updateOne to avoid VersionError
       await Chat.updateOne(
         { userId },
         {
@@ -114,36 +108,38 @@ router.get('/', authMiddleware, async (req, res) => {
         }
       );
     } else {
-      console.warn(
-        'Agent stream finished but no finalAnswer found in finalState.'
+      console.warn('Agent stream finished but no finalAnswer found in output.');
+      await Chat.updateOne(
+        { userId },
+        {
+          $push: {
+            messages: {
+              sender: 'agent',
+              text: "I'm sorry, I couldn't generate a response for that. Please try again.",
+              data: null
+            }
+          }
+        }
       );
-      // Optionally save an error message or handle this case
     }
-    // --- END FIX ---
 
-    // Send a final "close" event (optional, but good practice)
-    res.write('event: close\ndata: Stream finished\n\n');
-
-    res.end(); // End the stream explicitly after saving
+    // Send a standard DONE event
+    res.write('data: [DONE]\n\n');
+    res.end(); 
   } catch (err) {
     if (err.name === 'AbortError' || err.message === 'Abort' || err.message === 'Aborted' || (err.message && err.message.toLowerCase().includes('abort'))) {
       console.log('Agent execution aborted by client.');
       return;
     }
+    
     console.error('Chat route error:', err);
-    // Try to send an error event if headers haven't been fully sent
+    
     if (!res.headersSent) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Internal Server Error' }));
+      res.status(500).json({ error: 'Internal Server Error' });
     } else {
-      // If headers are sent, try sending an error event via SSE
-      res.write(
-        `data: ${JSON.stringify({
-          error: err.message || 'An internal error occurred',
-        })}\n\n`
-      );
-      res.write('event: close\ndata: Stream finished with error\n\n');
-      res.end(); // Ensure stream closure on error
+      res.write(`data: ${JSON.stringify({ error: err.message || 'An internal error occurred' })}\n\n`);
+      res.write('data: [DONE]\n\n');
+      res.end();
     }
   }
 });
