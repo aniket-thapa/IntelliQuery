@@ -128,6 +128,24 @@ router.put('/', authMiddleware, async (req, res) => {
       });
     }
 
+    // --- Verify MongoDB Connection ---
+    let client;
+    try {
+      client = new MongoClient(connectionUri, {
+        serverSelectionTimeoutMS: 5000,
+      });
+      await client.connect();
+      await client.db(dbName).command({ ping: 1 });
+    } catch (err) {
+      return res
+        .status(400)
+        .json({ status: false, error: 'Invalid MongoDB connection URL or database.' });
+    } finally {
+      if (client) {
+        await client.close();
+      }
+    }
+
     const encryptedUri = encrypt(connectionUri);
 
     const integration = await Integration.findOneAndUpdate(

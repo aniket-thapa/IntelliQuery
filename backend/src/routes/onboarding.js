@@ -117,14 +117,14 @@ router.get('/schema', authMiddleware, async (req, res) => {
 router.put('/schema', authMiddleware, async (req, res) => {
   try {
     const tenantId = req.user.tenantId;
-    const { name, collections } = req.body;
+    const { name, collections, databaseName } = req.body;
 
     const dbSchema = await DatabaseSchema.findOne({ tenantId });
     if (!dbSchema) {
       return res.status(404).json({ status: false, error: 'Schema not found' });
     }
 
-    if (name) dbSchema.name = name;
+    if (name || databaseName) dbSchema.databaseName = name || databaseName;
     if (collections) dbSchema.collections = collections;
 
     await dbSchema.save();

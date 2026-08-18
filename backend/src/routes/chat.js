@@ -168,6 +168,10 @@ router.get('/messages', authMiddleware, async (req, res) => {
     const startIndex = Math.max(totalMessages - pageNum * limitNum, 0);
     const endIndex = totalMessages - (pageNum - 1) * limitNum;
 
+    if (endIndex <= 0) {
+      return res.json({ status: true, messages: [], hasMore: false });
+    }
+
     // Slice messages in JS (get older messages for pagination)
     const paginatedMessages = chat.messages.slice(startIndex, endIndex);
     const hasMore = startIndex > 0; // Check if there are messages before the startIndex

@@ -98,7 +98,13 @@ router.post('/invite', authMiddleware, async (req, res) => {
 
     // 4. Send the email
     const inviteLink = `${process.env.APP_URL}/accept-invite?token=${inviteToken}`;
-    await sendEmail(email, 'invite', inviteLink);
+    const emailResult = await sendEmail(email, 'invite', inviteLink);
+
+    if (!emailResult.ok) {
+      // Rollback the invitation if email fails to send
+      await Invitation.findByIdAndDelete(invitation._id);
+      return res.status(500).json({ status: false, error: 'Failed to send invite email. Please try again.' });
+    }
 
     res.status(200).json({
       status: true,
